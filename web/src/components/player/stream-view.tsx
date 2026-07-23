@@ -1,12 +1,19 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { Player } from "@/components/player/player";
-import { AvailableStreams } from "@/components/available-streams";
+import { PreviouslyWatched } from "@/components/previously-watched";
 import { HeaderPortal } from "@/components/layout/header-portal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { addWatchedStream } from "@/lib/watched";
 
 const HEADER_HEIGHT = "2.75rem";
 
@@ -20,15 +27,20 @@ function balancedGrid(count: number): { cols: number; rows: number } {
 export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   const navigate = useNavigate();
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [newStreamKey, setNewStreamKey] = useState("");
+  const [newStreamName, setNewStreamName] = useState("");
+
+  // Remember every stream watched (used for "Previously watched").
+  useEffect(() => {
+    streamKeys.forEach((name) => addWatchedStream(name));
+  }, [streamKeys]);
 
   const goToKeys = (keys: string[]) => {
     void navigate({ to: "/$", params: { _splat: keys.join("/") } });
   };
 
-  const addStream = (streamKey: string) => {
-    const trimmed = streamKey.trim();
-    setNewStreamKey("");
+  const addStream = (streamName: string) => {
+    const trimmed = streamName.trim();
+    setNewStreamName("");
     setIsAddOpen(false);
     if (trimmed === "" || streamKeys.some((key) => key.toLowerCase() === trimmed.toLowerCase())) {
       return;
@@ -82,16 +94,24 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
           </DialogHeader>
           <Input
             autoFocus
-            placeholder="Stream key"
-            value={newStreamKey}
-            onChange={(event) => setNewStreamKey(event.target.value)}
+            placeholder="Stream name"
+            value={newStreamName}
+            onChange={(event) => setNewStreamName(event.target.value)}
             onKeyUp={(event) => {
               if (event.key === "Enter") {
-                addStream(newStreamKey);
+                addStream(newStreamName);
               }
             }}
           />
-          <AvailableStreams showHeader={false} onSelect={addStream} />
+          <PreviouslyWatched showHeader={false} exclude={streamKeys} onSelect={addStream} />
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setIsAddOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => addStream(newStreamName)} disabled={newStreamName.trim() === ""}>
+              Add
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -18,7 +18,7 @@ export function StatusPage() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Stream key</TableHead>
+            <TableHead>Stream name</TableHead>
             <TableHead>Public</TableHead>
             <TableHead>Video</TableHead>
             <TableHead>Audio</TableHead>

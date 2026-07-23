@@ -64,7 +64,7 @@ export function ProfilesPage() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Stream key</TableHead>
+            <TableHead>Stream name</TableHead>
             <TableHead>Public</TableHead>
             <TableHead>MOTD</TableHead>
             <TableHead>Token</TableHead>
@@ -120,7 +120,7 @@ export function ProfilesPage() {
           </DialogHeader>
           <Input
             autoFocus
-            placeholder="Stream key"
+            placeholder="Stream name"
             value={newStreamKey}
             onChange={(event) => setNewStreamKey(event.target.value)}
             onKeyUp={(event) => {

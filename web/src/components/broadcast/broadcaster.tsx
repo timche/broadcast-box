@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { MonitorUp, Webcam } from "lucide-react";
+import { Copy, Eye, EyeOff, MonitorUp, Webcam } from "lucide-react";
 import { addPublishTransceivers, negotiateWhip } from "@/lib/webrtc/whip";
 import { toast } from "@/lib/toast";
+import type { StreamStatus } from "@/lib/types";
+import { HeaderPortal } from "@/components/layout/header-portal";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const HEADER_HEIGHT = "2.75rem";
 
@@ -55,6 +58,9 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
   const [connectFailed, setConnectFailed] = useState(false);
   const [hasPacketLoss, setHasPacketLoss] = useState(false);
   const [hasSignal, setHasSignal] = useState(false);
+  const [previewHidden, setPreviewHidden] = useState(false);
+  const [isOnline, setIsOnline] = useState(false);
+  const [viewers, setViewers] = useState(0);
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -63,6 +69,13 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
   const badSignalCountRef = useRef(10);
 
   const shareUrl = `${window.location.origin}/${streamKey}`;
+
+  const copyShareUrl = () => {
+    void navigator.clipboard.writeText(shareUrl).then(
+      () => toast.success("Stream URL copied."),
+      () => toast.error("Could not copy the stream URL."),
+    );
+  };
 
   // Surface state transitions as toasts.
   useEffect(() => {
@@ -171,6 +184,11 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
           eventSourceRef.current = eventSource;
           if (eventSource !== null) {
             eventSource.onerror = () => eventSource.close();
+            eventSource.addEventListener("status", (event: MessageEvent<string>) => {
+              const status = JSON.parse(event.data) as StreamStatus;
+              setIsOnline(status.isOnline);
+              setViewers(status.viewers);
+            });
           }
         } catch {
           setConnectFailed(true);
@@ -225,11 +243,50 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
       className="flex w-full flex-col bg-black"
       style={{ height: `calc(100dvh - ${HEADER_HEIGHT})` }}
     >
-      <div className="min-h-0 flex-1">
-        <video ref={videoRef} autoPlay muted controls playsInline className="size-full object-contain" />
+      <HeaderPortal>
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <span className="max-w-[40vw] truncate">{shareUrl}</span>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-7"
+            onClick={copyShareUrl}
+            aria-label="Copy stream URL"
+          >
+            <Copy className="size-4" />
+          </Button>
+        </div>
+      </HeaderPortal>
+
+      <div className="relative min-h-0 flex-1">
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          controls
+          playsInline
+          className={cn("size-full object-contain", previewHidden && "hidden")}
+        />
+        {previewHidden && (
+          <div className="flex size-full items-center justify-center text-muted-foreground">
+            Preview hidden
+          </div>
+        )}
+
+        {publishSuccess && (
+          <span className="pointer-events-none absolute top-2 left-2 z-20 rounded bg-red-600 px-1.5 py-0.5 text-xs font-semibold tracking-wide text-white uppercase">
+            Live
+          </span>
+        )}
+        {isOnline && (
+          <span className="pointer-events-none absolute top-2 right-2 z-20 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-xs font-medium text-white">
+            <Eye className="size-3.5" />
+            {viewers}
+          </span>
+        )}
       </div>
 
-      <div className="flex w-full gap-2 bg-background p-2">
+      <div className="flex w-full flex-wrap gap-2 bg-background p-2">
         <Button className="flex-1" onClick={() => requestMedia("Screen")}>
           <MonitorUp className="size-4" />
           Share screen
@@ -238,21 +295,16 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
           <Webcam className="size-4" />
           Share webcam
         </Button>
+        <Button variant="outline" onClick={() => setPreviewHidden((hidden) => !hidden)}>
+          {previewHidden ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+          {previewHidden ? "Show preview" : "Hide preview"}
+        </Button>
         {publishSuccess && (
           <Button variant="destructive" onClick={() => void navigate({ to: "/" })}>
             End stream
           </Button>
         )}
       </div>
-
-      {publishSuccess && (
-        <p className="truncate bg-background px-2 pb-2 text-center text-sm text-muted-foreground">
-          Share:{" "}
-          <a href={shareUrl} target="_blank" rel="noreferrer" className="underline">
-            {shareUrl}
-          </a>
-        </p>
-      )}
     </div>
   );
 }

@@ -1,10 +1,10 @@
+import { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Users, Video } from "lucide-react";
-import { useState } from "react";
-import { AvailableStreams } from "@/components/available-streams";
+import { PreviouslyWatched } from "@/components/previously-watched";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -13,17 +13,17 @@ export const Route = createFileRoute("/")({
 function Home() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"watch" | "share">("watch");
-  const [streamKey, setStreamKey] = useState("");
+  const [streamName, setStreamName] = useState("");
 
   const submit = () => {
-    const key = streamKey.trim();
-    if (key === "") {
+    const name = streamName.trim();
+    if (name === "") {
       return;
     }
     if (mode === "share") {
-      void navigate({ to: "/publish/$streamKey", params: { streamKey: key } });
+      void navigate({ to: "/publish/$streamKey", params: { streamKey: name } });
     } else {
-      void navigate({ to: "/$", params: { _splat: key } });
+      void navigate({ to: "/$", params: { _splat: name } });
     }
   };
 
@@ -56,21 +56,21 @@ function Home() {
           <div className="flex flex-col gap-2">
             <Input
               autoFocus
-              placeholder={mode === "share" ? "Choose a stream key" : "Enter a stream key to watch"}
-              value={streamKey}
-              onChange={(event) => setStreamKey(event.target.value)}
+              placeholder={mode === "share" ? "Choose a stream name" : "Enter a stream name to watch"}
+              value={streamName}
+              onChange={(event) => setStreamName(event.target.value)}
               onKeyUp={(event) => {
                 if (event.key === "Enter") {
                   submit();
                 }
               }}
             />
-            <Button onClick={submit} disabled={streamKey.trim() === ""}>
+            <Button onClick={submit} disabled={streamName.trim() === ""}>
               {mode === "share" ? "Start streaming" : "Watch stream"}
             </Button>
           </div>
 
-          <AvailableStreams />
+          <PreviouslyWatched />
         </CardContent>
       </Card>
     </div>
