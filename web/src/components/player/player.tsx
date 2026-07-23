@@ -1,135 +1,71 @@
-import { Maximize2, PictureInPicture2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { LayerSelector } from "@/components/player/layer-selector";
+import { Eye, X } from "lucide-react";
+import { setupWhepConnection } from "@/lib/webrtc/whep";
+import { toast } from "@/lib/toast";
+import type { StreamState, StreamStatus } from "@/lib/types";
 import { StatusMessage } from "@/components/player/status-message";
-import { VolumeControl } from "@/components/player/volume-control";
-import type { CurrentLayersMessage, StreamState, StreamStatus } from "@/lib/types";
-import { setupWhepConnection, type WhepHandlers } from "@/lib/webrtc/whep";
-
-const OVERLAY_HIDE_MS = 2500;
-const CLICK_DELAY_MS = 250;
-
-interface FullscreenElement extends HTMLElement {
-  webkitRequestFullscreen?: () => void;
-  webkitEnterFullscreen?: () => void;
-}
 
 interface PlayerProps {
   streamKey: string;
-  cinemaMode: boolean;
-  fillContainer?: boolean;
+  showClose?: boolean;
+  onClose?: () => void;
   onStreamStatusChange?: (streamKey: string, status: StreamStatus) => void;
-  onCloseStream?: () => void;
 }
 
 export function Player({
   streamKey: rawStreamKey,
-  cinemaMode,
-  fillContainer = false,
+  showClose = false,
+  onClose,
   onStreamStatusChange,
-  onCloseStream,
 }: PlayerProps) {
   const streamKey = decodeURIComponent(rawStreamKey).replace(/ /g, "_");
 
   const [streamState, setStreamState] = useState<StreamState>("Loading");
+  const [isOnline, setIsOnline] = useState(false);
   const [viewers, setViewers] = useState(0);
-  const [audioLayers, setAudioLayers] = useState<string[]>([]);
-  const [videoLayers, setVideoLayers] = useState<string[]>([]);
-  const [currentLayers, setCurrentLayers] = useState<CurrentLayersMessage>();
-  const [layerEndpoint, setLayerEndpoint] = useState("");
-  const [isMuted, setIsMuted] = useState(true);
-  const [volume, setVolume] = useState(50);
-  const [overlayVisible, setOverlayVisible] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const overlayTimeoutRef = useRef<number>(undefined);
-  const clickTimeoutRef = useRef<number>(undefined);
   const statusChangeRef = useRef(onStreamStatusChange);
   statusChangeRef.current = onStreamStatusChange;
-
-  const playerId = `${streamKey}_player`;
-
-  const enterFullscreen = () => {
-    const element = videoRef.current as FullscreenElement | null;
-    if (element === null) {
-      return;
-    }
-    if (element.requestFullscreen) {
-      void element.requestFullscreen().catch(() => undefined);
-    } else if (element.webkitRequestFullscreen) {
-      element.webkitRequestFullscreen();
-    } else if (element.webkitEnterFullscreen) {
-      element.webkitEnterFullscreen();
-    }
-  };
-
-  const showOverlay = (visible: boolean) => {
-    setOverlayVisible(visible);
-    window.clearTimeout(overlayTimeoutRef.current);
-    if (visible) {
-      overlayTimeoutRef.current = window.setTimeout(
-        () => setOverlayVisible(false),
-        OVERLAY_HIDE_MS,
-      );
-    }
-  };
-
-  const handleClick = () => {
-    window.clearTimeout(clickTimeoutRef.current);
-    clickTimeoutRef.current = window.setTimeout(() => {
-      const video = videoRef.current;
-      if (video === null) {
-        return;
-      }
-      if (video.paused) {
-        void video.play();
-      } else {
-        video.pause();
-      }
-    }, CLICK_DELAY_MS);
-  };
-
-  const handleDoubleClick = () => {
-    window.clearTimeout(clickTimeoutRef.current);
-    enterFullscreen();
-  };
 
   useEffect(() => {
     let currentConnection: RTCPeerConnection | null = null;
     let cancelled = false;
 
-    const handlers: Omit<WhepHandlers, "onStreamRestart"> = {
-      videoRef,
-      onLayerEndpoint: setLayerEndpoint,
-      onLayers: (audio, video) => {
-        setAudioLayers(audio);
-        setVideoLayers(video);
-      },
-      onCurrentLayers: setCurrentLayers,
-      onOffline: () => setStreamState("Offline"),
-      onStreamStatus: (status) => {
-        setViewers(status.viewers);
-        statusChangeRef.current?.(streamKey, status);
-
-        if (!status.isOnline) {
-          setStreamState("Offline");
-          return;
-        }
-        const video = videoRef.current;
-        if (
-          video !== null &&
-          !video.paused &&
-          video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
-        ) {
-          setStreamState("Playing");
-          return;
-        }
-        setStreamState("Loading");
-      },
-    };
+    const video = videoRef.current;
+    if (video !== null) {
+      video.muted = true;
+    }
 
     const connect = () => {
-      setupWhepConnection(streamKey, { ...handlers, onStreamRestart: connect })
+      setupWhepConnection(streamKey, {
+        videoRef,
+        onOffline: () => {
+          setIsOnline(false);
+          setStreamState("Offline");
+        },
+        onStreamRestart: connect,
+        onStreamStatus: (status) => {
+          setIsOnline(status.isOnline);
+          setViewers(status.viewers);
+          statusChangeRef.current?.(streamKey, status);
+
+          if (!status.isOnline) {
+            setStreamState("Offline");
+            return;
+          }
+          const currentVideo = videoRef.current;
+          if (
+            currentVideo !== null &&
+            !currentVideo.paused &&
+            currentVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+          ) {
+            setStreamState("Playing");
+            return;
+          }
+          setStreamState("Loading");
+        },
+      })
         .then((connection) => {
           if (cancelled) {
             connection.close();
@@ -137,7 +73,10 @@ export function Player({
           }
           currentConnection = connection;
         })
-        .catch(() => setStreamState("Error"));
+        .catch(() => {
+          setStreamState("Error");
+          toast.error(`Could not connect to "${streamKey}".`);
+        });
     };
 
     connect();
@@ -149,118 +88,49 @@ export function Player({
       cancelled = true;
       window.removeEventListener("beforeunload", beforeUnload);
       currentConnection?.close();
-      window.clearTimeout(overlayTimeoutRef.current);
     };
   }, [streamKey]);
 
   return (
-    <div
-      id={playerId}
-      className={`group relative w-full overflow-hidden rounded-md bg-black ${fillContainer ? "h-full" : "aspect-video"}`}
-      style={cinemaMode ? { maxHeight: "100vh", maxWidth: "100vw" } : undefined}
-      onMouseMove={() => showOverlay(true)}
-      onMouseEnter={() => showOverlay(true)}
-      onMouseLeave={() => showOverlay(false)}
-    >
+    <div className="relative size-full bg-black">
       <video
         ref={videoRef}
         autoPlay
         playsInline
-        muted={isMuted}
-        className="size-full bg-black"
-        onClick={handleClick}
-        onDoubleClick={handleDoubleClick}
+        controls
+        className="size-full bg-black object-contain"
         onPlaying={() => setStreamState("Playing")}
         onLoadStart={() => setStreamState("Loading")}
-        onVolumeChange={(event) => {
-          setIsMuted(event.currentTarget.muted);
-          setVolume(Math.round(event.currentTarget.volume * 100));
-        }}
-        onLoadedData={(event) => {
-          event.currentTarget.volume = volume / 100;
-          void event.currentTarget.play();
-        }}
+        onLoadedData={(event) => void event.currentTarget.play().catch(() => undefined)}
         onEnded={() => setStreamState("Offline")}
       />
 
-      <StatusMessage streamKey={streamKey} state={streamState} />
+      {streamState === "Playing" && (
+        <span className="pointer-events-none absolute top-2 left-2 z-20 rounded bg-red-600 px-1.5 py-0.5 text-xs font-semibold tracking-wide text-white uppercase">
+          Live
+        </span>
+      )}
 
-      {/* Top-right actions */}
-      <div className="absolute top-2 right-2 z-30 flex gap-2">
-        {onCloseStream && (
+      <div className="absolute top-2 right-2 z-20 flex items-center gap-2">
+        {isOnline && (
+          <span className="pointer-events-none flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-xs font-medium text-white">
+            <Eye className="size-3.5" />
+            {viewers}
+          </span>
+        )}
+        {showClose && onClose && (
           <button
             type="button"
-            onClick={onCloseStream}
-            className="bg-destructive/80 hover:bg-destructive rounded-full p-2 text-white"
-            aria-label="Close stream"
+            onClick={onClose}
+            aria-label="Remove stream"
+            className="rounded-full bg-black/60 p-1 text-white hover:bg-black/80"
           >
             <X className="size-4" />
           </button>
         )}
       </div>
 
-      {/* Bottom control bar (also the react-grid-layout drag handle) */}
-      <div
-        className={`player-drag-handle absolute inset-x-0 bottom-0 z-30 flex h-10 cursor-move items-center gap-3 bg-black/70 px-3 text-white transition-opacity duration-300 ${
-          overlayVisible ? "opacity-100" : "opacity-0"
-        }`}
-      >
-        <div className="player-drag-cancel flex items-center gap-3">
-          <VolumeControl
-            isMuted={isMuted}
-            volume={volume}
-            disabled={audioLayers.length === 0}
-            onVolumeChange={(value) => {
-              const video = videoRef.current;
-              if (video !== null) {
-                video.muted = value === 0;
-                video.volume = value / 100;
-              }
-            }}
-            onToggleMute={() => {
-              const video = videoRef.current;
-              if (video !== null) {
-                video.muted = !video.muted;
-              }
-            }}
-          />
-        </div>
-
-        <div className="flex-1" />
-
-        <span className="player-drag-cancel text-sm tabular-nums">{viewers}</span>
-
-        <div className="player-drag-cancel flex items-center gap-1">
-          <LayerSelector
-            kind="video"
-            layers={videoLayers}
-            layerEndpoint={layerEndpoint}
-            currentLayer={currentLayers?.videoLayerCurrent ?? ""}
-          />
-          <LayerSelector
-            kind="audio"
-            layers={audioLayers}
-            layerEndpoint={layerEndpoint}
-            currentLayer={currentLayers?.audioLayerCurrent ?? ""}
-          />
-          <button
-            type="button"
-            className="player-drag-cancel flex items-center"
-            onClick={() => void videoRef.current?.requestPictureInPicture().catch(() => undefined)}
-            aria-label="Picture in picture"
-          >
-            <PictureInPicture2 className="size-4" />
-          </button>
-          <button
-            type="button"
-            className="player-drag-cancel flex items-center"
-            onClick={enterFullscreen}
-            aria-label="Fullscreen"
-          >
-            <Maximize2 className="size-4" />
-          </button>
-        </div>
-      </div>
+      <StatusMessage streamKey={streamKey} state={streamState} />
     </div>
   );
 }

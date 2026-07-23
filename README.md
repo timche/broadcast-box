@@ -454,7 +454,8 @@ The frontend ships the following browser routes:
 | `/`                    | Home page for joining an existing stream or navigating to browser publishing.                 |
 | `/publish/{streamKey}` | Browser publisher for screen/webcam streaming.                                                |
 | `/admin`               | Admin portal for status, profiles, and log viewing when `FRONTEND_ADMIN_TOKEN` is set.        |
-| `/{streamKey}`         | Player page for a stream. The built-in UI can add more streams to create a multi-view layout. |
+| `/{streamKey}`         | Player page for a stream (theatre mode).                                                      |
+| `/{streamKey}/{...}`   | Multi-view: one balanced, gapless mosaic per stream key in the path, so the URL persists.      |
 
 [license-image]: https://img.shields.io/badge/License-MIT-yellow.svg
 [license-url]: https://opensource.org/licenses/MIT

@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { clearAdminToken, getAdminToken, setAdminToken } from "@/lib/admin-auth";
 import { verifyAdminToken } from "@/lib/queries/admin";
+import { toast } from "@/lib/toast";
 
 type Menu = "Status" | "Profiles" | "Logging";
 const MENUS: Menu[] = ["Status", "Profiles", "Logging"];
@@ -17,7 +18,6 @@ export function AdminConsole() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [menu, setMenu] = useState<Menu>("Status");
   const [token, setToken] = useState("");
-  const [error, setError] = useState("");
 
   useEffect(() => {
     const existing = getAdminToken();
@@ -39,13 +39,12 @@ export function AdminConsole() {
         if (response.isValid) {
           setAdminToken(token);
           setIsLoggedIn(true);
-          setError("");
         } else {
           clearAdminToken();
-          setError(response.errorMessage || "Invalid login");
+          toast.error(response.errorMessage || "Invalid login");
         }
       })
-      .catch(() => setError("Invalid login"));
+      .catch(() => toast.error("Invalid login"));
   };
 
   const logout = () => {
@@ -69,7 +68,6 @@ export function AdminConsole() {
             }
           }}
         />
-        {error !== "" && <p className="text-destructive text-sm">{error}</p>}
         <Button onClick={login}>Log in</Button>
       </div>
     );

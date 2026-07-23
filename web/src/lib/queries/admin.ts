@@ -5,6 +5,7 @@ import {
   isInvalidAdminSessionResponse,
 } from "@/lib/admin-auth";
 import { api, getErrorStatus } from "@/lib/api";
+import { toast } from "@/lib/toast";
 import type { AdminProfile, StatusResult } from "@/lib/types";
 
 interface LoginResponse {
@@ -99,6 +100,7 @@ function useProfileMutation(path: string) {
   return useMutation({
     mutationFn: (streamKey: string) => adminPost(path, streamKey),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "profiles"] }),
+    onError: () => toast.error("The profile action failed."),
   });
 }
 

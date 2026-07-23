@@ -1,53 +1,25 @@
 import { createRootRoute, Link, Outlet } from "@tanstack/react-router";
-import { useCinemaMode } from "@/providers/cinema-mode";
+import { HEADER_ACTIONS_ID } from "@/components/layout/header-portal";
+
+export const HEADER_HEIGHT_REM = 2.75;
 
 export const Route = createRootRoute({
   component: RootLayout,
 });
 
 function RootLayout() {
-  const { cinemaMode } = useCinemaMode();
-
   return (
     <div className="flex min-h-screen flex-col">
-      {!cinemaMode && (
-        <nav className="bg-card/80 fixed inset-x-0 top-0 z-40 border-b px-4 py-3 backdrop-blur">
-          <Link to="/" className="text-2xl font-light">
-            Broadcast Box
-          </Link>
-        </nav>
-      )}
+      <header className="fixed inset-x-0 top-0 z-40 flex h-11 items-center gap-2 border-b bg-card/80 px-3 backdrop-blur">
+        <Link to="/" className="text-sm font-semibold tracking-tight">
+          Broadcast Box
+        </Link>
+        <div id={HEADER_ACTIONS_ID} className="ml-auto flex items-center gap-2" />
+      </header>
 
-      <main className={cinemaMode ? "flex-1" : "flex-1 pt-16"}>
+      <main className="flex flex-1 flex-col pt-11">
         <Outlet />
       </main>
-
-      {!cinemaMode && (
-        <footer className="container mx-auto px-2 py-6">
-          <ul className="text-muted-foreground flex items-center justify-center gap-4 text-sm">
-            <li>
-              <a
-                href="https://github.com/Glimesh/broadcast-box"
-                className="hover:underline"
-                target="_blank"
-                rel="noreferrer"
-              >
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a
-                href="https://pion.ly"
-                className="hover:underline"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Pion
-              </a>
-            </li>
-          </ul>
-        </footer>
-      )}
     </div>
   );
 }

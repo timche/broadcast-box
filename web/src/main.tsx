@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createRouter, RouterProvider } from "@tanstack/react-router";
 import { createRoot } from "react-dom/client";
-import { CinemaModeProvider } from "@/providers/cinema-mode";
+import { ToastProvider } from "@/components/ui/toaster";
 import { routeTree } from "./routeTree.gen";
 import "@fontsource-variable/inter";
 import "./styles.css";
@@ -26,8 +26,8 @@ if (rootElement === null) {
 
 createRoot(rootElement).render(
   <QueryClientProvider client={queryClient}>
-    <CinemaModeProvider>
+    <ToastProvider>
       <RouterProvider router={router} />
-    </CinemaModeProvider>
+    </ToastProvider>
   </QueryClientProvider>,
 );

@@ -1,9 +1,11 @@
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { MonitorUp, Webcam } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 import { addPublishTransceivers, negotiateWhip } from "@/lib/webrtc/whip";
+import { toast } from "@/lib/toast";
+import { Button } from "@/components/ui/button";
+
+const HEADER_HEIGHT = "2.75rem";
 
 const MEDIA_CONSTRAINTS: MediaStreamConstraints = {
   audio: true,
@@ -11,22 +13,6 @@ const MEDIA_CONSTRAINTS: MediaStreamConstraints = {
 };
 
 type MediaSource = "None" | "Screen" | "Webcam";
-type BannerTone = "error" | "warning" | "success";
-
-function Banner({ tone, children }: { tone: BannerTone; children: React.ReactNode }) {
-  return (
-    <div
-      className={cn(
-        "rounded-md border px-4 py-2 text-sm",
-        tone === "error" && "border-destructive/40 bg-destructive/15 text-destructive-foreground",
-        tone === "warning" && "border-yellow-500/40 bg-yellow-500/15 text-yellow-200",
-        tone === "success" && "border-emerald-500/40 bg-emerald-500/15 text-emerald-200",
-      )}
-    >
-      {children}
-    </div>
-  );
-}
 
 function getMediaErrorMessage(error: unknown): string {
   if (!navigator.mediaDevices) {
@@ -62,7 +48,6 @@ interface BroadcasterProps {
 export function Broadcaster({ streamKey }: BroadcasterProps) {
   const navigate = useNavigate();
 
-  const [mediaError, setMediaError] = useState<string | null>(null);
   const [source, setSource] = useState<MediaSource>("None");
   const [requestCount, setRequestCount] = useState(0);
   const [publishSuccess, setPublishSuccess] = useState(false);
@@ -79,13 +64,35 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
 
   const shareUrl = `${window.location.origin}/${streamKey}`;
 
+  // Surface state transitions as toasts.
+  useEffect(() => {
+    if (publishSuccess) {
+      toast.success("You are live!");
+    }
+  }, [publishSuccess]);
+  useEffect(() => {
+    if (disconnected) {
+      toast.error("The connection to the server was lost.");
+    }
+  }, [disconnected]);
+  useEffect(() => {
+    if (connectFailed) {
+      toast.error("Failed to connect to the streaming server.");
+    }
+  }, [connectFailed]);
+  useEffect(() => {
+    if (hasPacketLoss) {
+      toast.error("Your connection is experiencing packet loss.");
+    }
+  }, [hasPacketLoss]);
+
   const stopStream = useCallback((stream: MediaStream | null) => {
     stream?.getTracks().forEach((track) => track.stop());
   }, []);
 
   const requestMedia = (nextSource: Exclude<MediaSource, "None">) => {
     if (!navigator.mediaDevices) {
-      setMediaError(getMediaErrorMessage(null));
+      toast.error(getMediaErrorMessage(null));
       return;
     }
     setSource(nextSource);
@@ -151,7 +158,6 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
           const state = peerConnection.iceConnectionState;
           if (state === "connected" || state === "completed") {
             setPublishSuccess(true);
-            setMediaError(null);
             setDisconnected(false);
           } else if (state === "disconnected" || state === "failed") {
             setPublishSuccess(false);
@@ -171,7 +177,7 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
         }
       },
       (error: unknown) => {
-        setMediaError(getMediaErrorMessage(error));
+        toast.error(getMediaErrorMessage(error));
         setSource("None");
       },
     );
@@ -215,46 +221,37 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
   }, [hasSignal]);
 
   return (
-    <div className="container mx-auto flex flex-col gap-2">
-      {mediaError !== null && <Banner tone="error">{mediaError}</Banner>}
-      {disconnected && <Banner tone="error">The connection to the server was lost.</Banner>}
-      {connectFailed && <Banner tone="error">Failed to connect to the streaming server.</Banner>}
-      {hasPacketLoss && (
-        <Banner tone="warning">Your connection is experiencing packet loss.</Banner>
-      )}
-      {publishSuccess && (
-        <Banner tone="success">
-          You are live! Share your stream:{" "}
-          <a href={shareUrl} target="_blank" rel="noreferrer" className="underline">
-            {shareUrl}
-          </a>
-        </Banner>
-      )}
+    <div
+      className="flex w-full flex-col bg-black"
+      style={{ height: `calc(100dvh - ${HEADER_HEIGHT})` }}
+    >
+      <div className="min-h-0 flex-1">
+        <video ref={videoRef} autoPlay muted controls playsInline className="size-full object-contain" />
+      </div>
 
-      <video
-        ref={videoRef}
-        autoPlay
-        muted
-        controls
-        playsInline
-        className="aspect-video w-full rounded-md bg-black"
-      />
-
-      <div className="flex flex-row gap-2">
-        <Button onClick={() => requestMedia("Screen")}>
+      <div className="flex w-full gap-2 bg-background p-2">
+        <Button className="flex-1" onClick={() => requestMedia("Screen")}>
           <MonitorUp className="size-4" />
           Share screen
         </Button>
-        <Button variant="secondary" onClick={() => requestMedia("Webcam")}>
+        <Button className="flex-1" variant="secondary" onClick={() => requestMedia("Webcam")}>
           <Webcam className="size-4" />
           Share webcam
         </Button>
+        {publishSuccess && (
+          <Button variant="destructive" onClick={() => void navigate({ to: "/" })}>
+            End stream
+          </Button>
+        )}
       </div>
 
       {publishSuccess && (
-        <Button variant="destructive" onClick={() => void navigate({ to: "/" })}>
-          End stream
-        </Button>
+        <p className="truncate bg-background px-2 pb-2 text-center text-sm text-muted-foreground">
+          Share:{" "}
+          <a href={shareUrl} target="_blank" rel="noreferrer" className="underline">
+            {shareUrl}
+          </a>
+        </p>
       )}
     </div>
   );
