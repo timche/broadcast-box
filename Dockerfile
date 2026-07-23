@@ -1,7 +1,7 @@
-FROM node AS web-build
+FROM oven/bun:latest AS web-build
 WORKDIR /broadcast-box/web
 COPY . /broadcast-box
-RUN npm install && npm run build
+RUN bun install --frozen-lockfile && bun run build
 
 FROM golang:alpine AS go-build
 WORKDIR /broadcast-box

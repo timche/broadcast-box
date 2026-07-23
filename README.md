@@ -181,11 +181,12 @@ If you only want the backend API or CLI helpers without serving the built fronte
 
 #### Frontend
 
-React dependencies are installed by running `npm install` in the `web` directory.
+The frontend is a TypeScript + Vite app (TanStack Router, TanStack Query, shadcn/Base UI). Dependencies are installed by running `bun install` in the `web` directory.
 
-- `npm run build` builds production assets into `web/build`
-- `npm start` runs the Vite dev server and proxies `/api` to the backend
-- `npm run host` runs the same Vite dev server on your local network
+- `bun run build` builds production assets into `web/build`
+- `bun run dev` runs the Vite dev server and proxies `/api` to the backend
+- `bun run host` runs the same Vite dev server on your local network
+- `bun run lint` / `bun run format` run oxlint and oxfmt
 
 If everything is successful, you should see output similar to:
 
@@ -256,7 +257,7 @@ The frontend can be configured by passing these URL Parameters.
 | `ENABLE_HTTP_REDIRECT`  | When set, enables automatic redirection from HTTP to HTTPS.                                                  |
 | `HTTPS_REDIRECT_PORT`   | Port to listen on for the HTTP-to-HTTPS redirect server.                                                     |
 | `NETWORK_TEST_ON_START` | If `true`, checks network connectivity on startup.                                                           |
-| `DISABLE_STATUS`        | When set, disables `/api/status`. Stream discovery and `/statistics` rely on this endpoint.                  |
+| `DISABLE_STATUS`        | When set, disables `/api/status`. Stream discovery relies on this endpoint.                                  |
 | `ENABLE_PROFILING`      | If `true`, enables PPROF profiling on `localhost:6060`.                                                      |
 
 ### SSL Configuration
@@ -278,7 +279,7 @@ The frontend can be configured by passing these URL Parameters.
 
 | Variable               | Description                                                                               |
 | ---------------------- | ----------------------------------------------------------------------------------------- |
-| `DISABLE_FRONTEND`     | Disables frontend asset serving and UI routes (`/`, `/publish`, `/statistics`, `/admin`). |
+| `DISABLE_FRONTEND`     | Disables frontend asset serving and UI routes (`/`, `/publish`, `/admin`).                 |
 | `FRONTEND_PATH`        | Path to built frontend assets. Defaults to `./web/build`.                                 |
 | `FRONTEND_ADMIN_TOKEN` | Enables `/admin` and defines the bearer token required to log in.                         |
 
@@ -451,8 +452,7 @@ The frontend ships the following browser routes:
 | Route                  | Description                                                                                   |
 | ---------------------- | --------------------------------------------------------------------------------------------- |
 | `/`                    | Home page for joining an existing stream or navigating to browser publishing.                 |
-| `/publish/{streamKey}` | Browser publisher for screen/webcam streaming and reserved profile settings.                  |
-| `/statistics`          | Live stream and subscriber statistics derived from `/api/status`.                             |
+| `/publish/{streamKey}` | Browser publisher for screen/webcam streaming.                                                |
 | `/admin`               | Admin portal for status, profiles, and log viewing when `FRONTEND_ADMIN_TOKEN` is set.        |
 | `/{streamKey}`         | Player page for a stream. The built-in UI can add more streams to create a multi-view layout. |
 
