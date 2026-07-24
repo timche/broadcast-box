@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Pencil, SendHorizontal } from "lucide-react";
+import { ChevronDown, ChevronRight, SendHorizontal } from "lucide-react";
 import { type FormEvent, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -73,13 +73,12 @@ export function Chat({
 
   const [nickname, setNickname] = useState(getDisplayName);
   const [nameDraft, setNameDraft] = useState("");
-  const [editingName, setEditingName] = useState(false);
   const [draft, setDraft] = useState("");
 
   const trimmedNickname = nickname.trim();
   const hasNickname = trimmedNickname.length > 0;
-  // Until a nickname is set, the message input is replaced by the nickname form.
-  const showNameForm = editingName || !hasNickname;
+  // A nickname is set once, up front — until then the message input is replaced
+  // by the nickname form and there is no way to change it afterwards.
   const canSend = status === "connected" && draft.trim().length > 0 && hasNickname;
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -87,11 +86,6 @@ export function Chat({
     if (sendMessage(draft, trimmedNickname)) {
       setDraft("");
     }
-  };
-
-  const startEditingName = () => {
-    setNameDraft(nickname);
-    setEditingName(true);
   };
 
   const commitName = (event: FormEvent<HTMLFormElement>) => {
@@ -102,7 +96,6 @@ export function Chat({
     }
     setDisplayName(trimmed);
     setNickname(trimmed);
-    setEditingName(false);
   };
 
   const statusColor = useMemo(() => {
@@ -175,42 +168,8 @@ export function Chat({
           </MessageScrollerProvider>
 
           <div className="shrink-0 border-t p-3">
-            {showNameForm ? (
-              <form onSubmit={commitName} className="flex flex-col gap-2">
-                {!hasNickname && (
-                  <p className="text-muted-foreground text-xs">Set a nickname to join the chat.</p>
-                )}
-                <div className="flex items-center gap-2">
-                  <Input
-                    autoFocus
-                    value={nameDraft}
-                    maxLength={MAX_DISPLAY_NAME_LENGTH}
-                    onChange={(event) => setNameDraft(event.target.value)}
-                    placeholder="Nickname"
-                    aria-label="Nickname"
-                  />
-                  <Button type="submit" disabled={nameDraft.trim().length === 0}>
-                    {hasNickname ? "Save" : "Join"}
-                  </Button>
-                  {hasNickname && (
-                    <Button type="button" variant="ghost" onClick={() => setEditingName(false)}>
-                      Cancel
-                    </Button>
-                  )}
-                </div>
-              </form>
-            ) : (
+            {hasNickname ? (
               <form onSubmit={submit} className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="ghost"
-                  onClick={startEditingName}
-                  aria-label="Change nickname"
-                  title={`Chatting as ${trimmedNickname}`}
-                >
-                  <Pencil className="size-4" />
-                </Button>
                 <Input
                   value={draft}
                   maxLength={MAX_MESSAGE_LENGTH}
@@ -221,6 +180,23 @@ export function Chat({
                 <Button type="submit" size="icon" disabled={!canSend} aria-label="Send message">
                   <SendHorizontal className="size-4" />
                 </Button>
+              </form>
+            ) : (
+              <form onSubmit={commitName} className="flex flex-col gap-2">
+                <p className="text-muted-foreground text-xs">Set a nickname to join the chat.</p>
+                <div className="flex items-center gap-2">
+                  <Input
+                    autoFocus
+                    value={nameDraft}
+                    maxLength={MAX_DISPLAY_NAME_LENGTH}
+                    onChange={(event) => setNameDraft(event.target.value)}
+                    placeholder="Nickname"
+                    aria-label="Nickname"
+                  />
+                  <Button type="submit" disabled={nameDraft.trim().length === 0}>
+                    Join
+                  </Button>
+                </div>
               </form>
             )}
           </div>
