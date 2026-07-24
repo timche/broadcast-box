@@ -56,6 +56,8 @@ interface ChatProps {
   channel: ChatConnection | null;
   title?: string;
   className?: string;
+  /** When set, chat uses this name and skips the join form (e.g. the broadcaster). */
+  fixedName?: string;
   /** When set, the header becomes a toggle that collapses the chat body. */
   collapsible?: boolean;
   collapsed?: boolean;
@@ -66,6 +68,7 @@ export function Chat({
   channel,
   title = "Stream Chat",
   className,
+  fixedName,
   collapsible = false,
   collapsed = false,
   onCollapsedChange,
@@ -76,7 +79,7 @@ export function Chat({
   const [nameDraft, setNameDraft] = useState("");
   const [draft, setDraft] = useState("");
 
-  const trimmedNickname = nickname.trim();
+  const trimmedNickname = (fixedName ?? nickname).trim();
   const hasNickname = trimmedNickname.length > 0;
   // A nickname is set once, up front — until then the message input is replaced
   // by the nickname form and there is no way to change it afterwards.

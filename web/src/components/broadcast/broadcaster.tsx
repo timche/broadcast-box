@@ -258,20 +258,31 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
   return (
     <div className="flex w-full flex-col" style={{ height: `calc(100dvh - ${HEADER_HEIGHT})` }}>
       <HeaderPortal>
-        <InputGroup className="h-7 w-auto max-w-[60vw]">
-          <InputGroupInput
-            readOnly
-            value={shareUrl}
-            onFocus={(event) => event.currentTarget.select()}
-            aria-label="Stream URL"
-            className="field-sizing-content w-auto flex-none px-2 text-xs"
-          />
-          <InputGroupAddon align="inline-end">
-            <InputGroupButton size="icon-xs" onClick={copyShareUrl} aria-label="Copy stream URL">
-              {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-            </InputGroupButton>
-          </InputGroupAddon>
-        </InputGroup>
+        <div className="flex items-center gap-2">
+          <InputGroup className="h-7 w-auto max-w-[50vw]">
+            <InputGroupInput
+              readOnly
+              value={shareUrl}
+              onFocus={(event) => event.currentTarget.select()}
+              aria-label="Stream URL"
+              className="field-sizing-content w-auto flex-none px-2 text-xs"
+            />
+            <InputGroupAddon align="inline-end">
+              <InputGroupButton size="icon-xs" onClick={copyShareUrl} aria-label="Copy stream URL">
+                {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+              </InputGroupButton>
+            </InputGroupAddon>
+          </InputGroup>
+          <Button
+            size="sm"
+            variant={chatOpen ? "default" : "secondary"}
+            onClick={() => setChatOpen((open) => !open)}
+            aria-label={chatOpen ? "Hide chat" : "Show chat"}
+          >
+            <MessageSquare className="size-4" />
+            Chat
+          </Button>
+        </div>
       </HeaderPortal>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
@@ -323,13 +334,6 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
                 {previewHidden ? "Show preview" : "Hide preview"}
               </span>
             </Button>
-            <Button
-              variant={chatOpen ? "default" : "secondary"}
-              onClick={() => setChatOpen((open) => !open)}
-              aria-label={chatOpen ? "Hide chat" : "Show chat"}
-            >
-              <MessageSquare className="size-4" />
-            </Button>
             {publishSuccess && (
               <Button
                 className="flex-1"
@@ -345,7 +349,7 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
 
         {chatOpen && (
           <aside className="min-h-0 flex-1 border-t md:w-80 md:flex-none md:border-t-0 md:border-l">
-            <Chat channel={chatChannel} />
+            <Chat channel={chatChannel} fixedName={streamKey} />
           </aside>
         )}
       </div>
