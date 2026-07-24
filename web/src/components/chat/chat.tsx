@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Pencil, SendHorizontal } from "lucide-react";
+import { ChevronDown, ChevronRight, Eye, Pencil, SendHorizontal } from "lucide-react";
 import { type FormEvent, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,6 +58,8 @@ interface ChatProps {
   className?: string;
   /** When set, chat uses this name and skips the join form (e.g. the broadcaster). */
   fixedName?: string;
+  /** Viewer count shown in the header; hidden when null. */
+  viewers?: number | null;
   /** When set, the header becomes a toggle that collapses the chat body. */
   collapsible?: boolean;
   collapsed?: boolean;
@@ -69,6 +71,7 @@ export function Chat({
   title = "Stream Chat",
   className,
   fixedName,
+  viewers,
   collapsible = false,
   collapsed = false,
   onCollapsedChange,
@@ -135,9 +138,17 @@ export function Chat({
           {title}
         </span>
       </span>
-      <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
-        <span className={cn("size-2 rounded-full", statusColor)} />
-        {STATUS_LABEL[status]}
+      <span className="text-muted-foreground flex items-center gap-2 text-xs">
+        {viewers != null && (
+          <span className="flex items-center gap-1 tabular-nums" title={`${viewers} watching`}>
+            <Eye className="size-3.5" />
+            {viewers}
+          </span>
+        )}
+        <span className="flex items-center gap-1.5">
+          <span className={cn("size-2 rounded-full", statusColor)} />
+          {STATUS_LABEL[status]}
+        </span>
       </span>
     </>
   );

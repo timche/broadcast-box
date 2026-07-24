@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import type { StreamStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { addWatchedStream } from "@/lib/watched";
 import type { ChatConnection } from "@/lib/webrtc/chat";
@@ -40,9 +41,17 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   const [chatChannels, setChatChannels] = useState<Record<string, ChatConnection | null>>({});
 
   const [collapsedChats, setCollapsedChats] = useState<Record<string, boolean>>({});
+  const [viewerCounts, setViewerCounts] = useState<Record<string, number>>({});
 
   const setChatChannelFor = useCallback((streamKey: string, channel: ChatConnection | null) => {
     setChatChannels((current) => ({ ...current, [streamKey]: channel }));
+  }, []);
+
+  const handleStreamStatus = useCallback((streamKey: string, status: StreamStatus) => {
+    setViewerCounts((current) => ({
+      ...current,
+      [streamKey]: status.isOnline ? status.viewers : 0,
+    }));
   }, []);
 
   // Remember every stream watched (used for "Previously watched").
@@ -114,6 +123,7 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
             <Player
               streamKey={streamKeys[0]}
               onChatChannel={(c) => setChatChannelFor(streamKeys[0], c)}
+              onStreamStatusChange={handleStreamStatus}
             />
           ) : (
             // Re-tiling on a stream set change is done by remounting the group
@@ -144,6 +154,7 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
                                 <Player
                                   streamKey={streamKey}
                                   onChatChannel={(c) => setChatChannelFor(streamKey, c)}
+                                  onStreamStatusChange={handleStreamStatus}
                                 />
                               </div>
                             </div>
@@ -178,6 +189,7 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
                   <Chat
                     title={isSingle ? undefined : streamKey}
                     channel={chatChannels[streamKey] ?? null}
+                    viewers={viewerCounts[streamKey] ?? 0}
                     collapsible={!isSingle}
                     collapsed={!isSingle && collapsed}
                     onCollapsedChange={(next) =>

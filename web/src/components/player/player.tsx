@@ -1,4 +1,4 @@
-import { Eye, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { StatusMessage } from "@/components/player/status-message";
 import { toast } from "@/components/ui/toast";
@@ -27,8 +27,6 @@ export function Player({
   const streamKey = decodeURIComponent(rawStreamKey).replace(/ /g, "_");
 
   const [streamState, setStreamState] = useState<StreamState>("Loading");
-  const [isOnline, setIsOnline] = useState(false);
-  const [viewers, setViewers] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const statusChangeRef = useRef(onStreamStatusChange);
@@ -53,13 +51,10 @@ export function Player({
         videoRef,
         onChatChannel: chatEnabled ? (channel) => chatChannelRef.current?.(channel) : undefined,
         onOffline: () => {
-          setIsOnline(false);
           setStreamState("Offline");
         },
         onStreamRestart: connect,
         onStreamStatus: (status) => {
-          setIsOnline(status.isOnline);
-          setViewers(status.viewers);
           statusChangeRef.current?.(streamKey, status);
 
           if (!status.isOnline) {
@@ -123,30 +118,8 @@ export function Player({
         onEnded={() => setStreamState("Offline")}
       />
 
-      {streamState === "Playing" && (
-        <span
-          className={cn(
-            "pointer-events-none absolute top-2 left-2 z-20 rounded bg-red-600 px-1.5 py-0.5 text-xs font-semibold tracking-wide text-white uppercase",
-            fadeClass,
-          )}
-        >
-          Live
-        </span>
-      )}
-
-      <div className="absolute top-2 right-2 z-20 flex items-center gap-2">
-        {isOnline && (
-          <span
-            className={cn(
-              "pointer-events-none flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-xs font-medium text-white",
-              fadeClass,
-            )}
-          >
-            <Eye className="size-3.5" />
-            {viewers}
-          </span>
-        )}
-        {showClose && onClose && (
+      {showClose && onClose && (
+        <div className={cn("absolute top-2 right-2 z-20", fadeClass)}>
           <button
             type="button"
             onClick={onClose}
@@ -155,8 +128,8 @@ export function Player({
           >
             <X className="size-4" />
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       <StatusMessage streamKey={streamKey} state={streamState} />
     </div>
