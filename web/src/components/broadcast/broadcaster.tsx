@@ -258,14 +258,14 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
   return (
     <div className="flex w-full flex-col" style={{ height: `calc(100dvh - ${HEADER_HEIGHT})` }}>
       <HeaderPortal>
-        <div className="flex items-center gap-2">
-          <InputGroup className="h-7 w-auto max-w-[50vw]">
+        <div className="flex min-w-0 items-center gap-2">
+          <InputGroup className="h-7 w-[min(55vw,22rem)] min-w-0">
             <InputGroupInput
               readOnly
               value={shareUrl}
               onFocus={(event) => event.currentTarget.select()}
               aria-label="Stream URL"
-              className="field-sizing-content w-auto flex-none px-2 text-xs"
+              className="min-w-0 px-2 text-xs"
             />
             <InputGroupAddon align="inline-end">
               <InputGroupButton size="icon-xs" onClick={copyShareUrl} aria-label="Copy stream URL">
@@ -278,6 +278,7 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
             variant={chatOpen ? "default" : "secondary"}
             onClick={() => setChatOpen((open) => !open)}
             aria-label={chatOpen ? "Hide chat" : "Show chat"}
+            className="shrink-0"
           >
             <MessageSquare className="size-4" />
             <span className="hidden sm:inline">{chatOpen ? "Hide chat" : "Show chat"}</span>
