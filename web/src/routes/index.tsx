@@ -73,7 +73,7 @@ function Home() {
             <Button
               variant={tab === "watch" ? "default" : "ghost"}
               onClick={() => selectTab("watch")}
-              className="h-auto flex-col gap-1 py-2 text-center text-xs leading-tight whitespace-normal sm:text-sm"
+              className="h-auto py-2 text-center text-xs leading-tight whitespace-normal sm:text-sm"
             >
               <Users className="size-4" />
               Watch
@@ -81,7 +81,7 @@ function Home() {
             <Button
               variant={tab === "stream" ? "default" : "ghost"}
               onClick={() => selectTab("stream")}
-              className="h-auto flex-col gap-1 py-2 text-center text-xs leading-tight whitespace-normal sm:text-sm"
+              className="h-auto py-2 text-center text-xs leading-tight whitespace-normal sm:text-sm"
             >
               <Video className="size-4" />
               Stream with Browser
@@ -89,7 +89,7 @@ function Home() {
             <Button
               variant={tab === "obs" ? "default" : "ghost"}
               onClick={() => selectTab("obs")}
-              className="h-auto flex-col gap-1 py-2 text-center text-xs leading-tight whitespace-normal sm:text-sm"
+              className="h-auto py-2 text-center text-xs leading-tight whitespace-normal sm:text-sm"
             >
               <BookOpen className="size-4" />
               Stream with OBS
