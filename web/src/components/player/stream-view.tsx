@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { MessageSquare, Plus, X } from "lucide-react";
+import { MessageSquare, Plus, Video, VideoOff, X } from "lucide-react";
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { Chat } from "@/components/chat/chat";
 import { HeaderPortal } from "@/components/layout/header-portal";
@@ -36,6 +36,7 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newStreamName, setNewStreamName] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
+  const [streamHidden, setStreamHidden] = useState(false);
   const [chatChannels, setChatChannels] = useState<Record<string, ChatConnection | null>>({});
 
   const [collapsedChats, setCollapsedChats] = useState<Record<string, boolean>>({});
@@ -74,6 +75,8 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
 
   const isSingle = streamKeys.length === 1;
   const rows = buildRows(streamKeys);
+  // Hiding the stream keeps chat visible (and expanded) but drops the video.
+  const showChat = chatOpen || streamHidden;
 
   return (
     <div className="w-full bg-black" style={{ height: `calc(100dvh - ${HEADER_HEIGHT})` }}>
@@ -82,6 +85,16 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
           <Button size="sm" variant="secondary" onClick={() => setIsAddOpen(true)}>
             <Plus className="size-4" />
             Add stream
+          </Button>
+          <Button
+            size="sm"
+            variant={streamHidden ? "default" : "secondary"}
+            onClick={() => setStreamHidden((hidden) => !hidden)}
+            aria-label={streamHidden ? "Show stream" : "Hide stream"}
+            title="Hide the video (keeps chat) — useful when streaming with OBS"
+          >
+            {streamHidden ? <VideoOff className="size-4" /> : <Video className="size-4" />}
+            <span className="hidden sm:inline">{streamHidden ? "Show stream" : "Hide stream"}</span>
           </Button>
           <Button
             size="sm"
@@ -96,7 +109,7 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
       </HeaderPortal>
 
       <div className="flex size-full flex-col md:flex-row">
-        <div className="relative min-h-0 min-w-0 flex-1">
+        <div className={cn("relative min-h-0 min-w-0 flex-1", streamHidden && "hidden")}>
           {isSingle ? (
             <Player
               streamKey={streamKeys[0]}
@@ -145,8 +158,13 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
           )}
         </div>
 
-        {chatOpen && (
-          <aside className="flex min-h-0 flex-1 flex-col overflow-y-auto border-t md:w-80 md:flex-none md:border-t-0 md:border-l">
+        {showChat && (
+          <aside
+            className={cn(
+              "flex min-h-0 flex-1 flex-col overflow-y-auto",
+              !streamHidden && "border-t md:w-80 md:flex-none md:border-t-0 md:border-l",
+            )}
+          >
             {streamKeys.map((streamKey) => {
               const collapsed = collapsedChats[streamKey] ?? false;
               return (
