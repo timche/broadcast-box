@@ -9,7 +9,7 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group";
-import { toast } from "@/lib/toast";
+import { toast } from "@/components/ui/toast";
 import type { StreamStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { addPublishTransceivers, negotiateWhip } from "@/lib/webrtc/whip";
@@ -83,29 +83,29 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
         setCopied(true);
         window.setTimeout(() => setCopied(false), 1500);
       },
-      () => toast.error("Could not copy the stream URL."),
+      () => toast.add({ description: "Could not copy the stream URL.", type: "error" }),
     );
   };
 
   // Surface state transitions as toasts.
   useEffect(() => {
     if (publishSuccess) {
-      toast.success("You are live!");
+      toast.add({ description: "You are live!", type: "success" });
     }
   }, [publishSuccess]);
   useEffect(() => {
     if (disconnected) {
-      toast.error("The connection to the server was lost.");
+      toast.add({ description: "The connection to the server was lost.", type: "error" });
     }
   }, [disconnected]);
   useEffect(() => {
     if (connectFailed) {
-      toast.error("Failed to connect to the streaming server.");
+      toast.add({ description: "Failed to connect to the streaming server.", type: "error" });
     }
   }, [connectFailed]);
   useEffect(() => {
     if (hasPacketLoss) {
-      toast.error("Your connection is experiencing packet loss.");
+      toast.add({ description: "Your connection is experiencing packet loss.", type: "error" });
     }
   }, [hasPacketLoss]);
 
@@ -115,7 +115,7 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
 
   const requestMedia = (nextSource: Exclude<MediaSource, "None">) => {
     if (!navigator.mediaDevices) {
-      toast.error(getMediaErrorMessage(null));
+      toast.add({ description: getMediaErrorMessage(null), type: "error" });
       return;
     }
     setSource(nextSource);
@@ -205,7 +205,7 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
         }
       },
       (error: unknown) => {
-        toast.error(getMediaErrorMessage(error));
+        toast.add({ description: getMediaErrorMessage(error), type: "error" });
         setSource("None");
       },
     );

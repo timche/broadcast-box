@@ -1,7 +1,7 @@
 import { Eye, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { StatusMessage } from "@/components/player/status-message";
-import { toast } from "@/lib/toast";
+import { toast } from "@/components/ui/toast";
 import type { StreamState, StreamStatus } from "@/lib/types";
 import { setupWhepConnection } from "@/lib/webrtc/whep";
 
@@ -75,7 +75,7 @@ export function Player({
         })
         .catch(() => {
           setStreamState("Error");
-          toast.error(`Could not connect to "${streamKey}".`);
+          toast.add({ description: `Could not connect to "${streamKey}".`, type: "error" });
         });
     };
 

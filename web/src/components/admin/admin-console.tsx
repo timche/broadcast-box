@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { clearAdminToken, getAdminToken, setAdminToken } from "@/lib/admin-auth";
 import { verifyAdminToken } from "@/lib/queries/admin";
-import { toast } from "@/lib/toast";
+import { toast } from "@/components/ui/toast";
 
 type Menu = "Status" | "Profiles" | "Logging";
 const MENUS: Menu[] = ["Status", "Profiles", "Logging"];
@@ -41,10 +41,10 @@ export function AdminConsole() {
           setIsLoggedIn(true);
         } else {
           clearAdminToken();
-          toast.error(response.errorMessage || "Invalid login");
+          toast.add({ description: response.errorMessage || "Invalid login", type: "error" });
         }
       })
-      .catch(() => toast.error("Invalid login"));
+      .catch(() => toast.add({ description: "Invalid login", type: "error" }));
   };
 
   const logout = () => {
