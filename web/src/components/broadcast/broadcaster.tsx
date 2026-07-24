@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Check, Copy, Eye, EyeOff, MonitorUp, Webcam } from "lucide-react";
+import { Check, Copy, Eye, EyeOff, MessageSquare, MonitorUp, Webcam } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Chat } from "@/components/chat/chat";
 import { HeaderPortal } from "@/components/layout/header-portal";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,6 +13,7 @@ import {
 import { toast } from "@/components/ui/toast";
 import type { StreamStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { createChatDataChannel } from "@/lib/webrtc/chat";
 import { addPublishTransceivers, negotiateWhip } from "@/lib/webrtc/whip";
 
 const HEADER_HEIGHT = "2.75rem";
@@ -68,6 +70,8 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
   const [isOnline, setIsOnline] = useState(false);
   const [viewers, setViewers] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [chatChannel, setChatChannel] = useState<RTCDataChannel | null>(null);
+  const [chatOpen, setChatOpen] = useState(true);
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -175,6 +179,9 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
         }
         localStreamRef.current = stream;
 
+        // Open the chat data channel before negotiation so the backend binds it.
+        setChatChannel(createChatDataChannel(peerConnection));
+
         addPublishTransceivers(peerConnection, audioTrack, videoTrack);
 
         peerConnection.oniceconnectionstatechange = () => {
@@ -249,10 +256,7 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
   }, [hasSignal]);
 
   return (
-    <div
-      className="flex w-full flex-col bg-black"
-      style={{ height: `calc(100dvh - ${HEADER_HEIGHT})` }}
-    >
+    <div className="flex w-full flex-col" style={{ height: `calc(100dvh - ${HEADER_HEIGHT})` }}>
       <HeaderPortal>
         <InputGroup className="h-7 w-auto max-w-[60vw]">
           <InputGroupInput
@@ -270,59 +274,76 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
         </InputGroup>
       </HeaderPortal>
 
-      <div className="relative min-h-0 flex-1">
-        <video
-          ref={videoRef}
-          autoPlay
-          muted
-          controls
-          playsInline
-          className={cn("size-full object-contain", previewHidden && "hidden")}
-        />
-        {previewHidden && (
-          <div className="text-muted-foreground flex size-full items-center justify-center">
-            Preview hidden
+      <div className="flex min-h-0 flex-1">
+        <div className="flex min-w-0 flex-1 flex-col bg-black">
+          <div className="relative min-h-0 flex-1">
+            <video
+              ref={videoRef}
+              autoPlay
+              muted
+              controls
+              playsInline
+              className={cn("size-full object-contain", previewHidden && "hidden")}
+            />
+            {previewHidden && (
+              <div className="text-muted-foreground flex size-full items-center justify-center">
+                Preview hidden
+              </div>
+            )}
+
+            {publishSuccess && (
+              <span className="pointer-events-none absolute top-2 left-2 z-20 rounded bg-red-600 px-1.5 py-0.5 text-xs font-semibold tracking-wide text-white uppercase">
+                Live
+              </span>
+            )}
+            {isOnline && (
+              <span className="pointer-events-none absolute top-2 right-2 z-20 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-xs font-medium text-white">
+                <Eye className="size-3.5" />
+                {viewers}
+              </span>
+            )}
           </div>
-        )}
 
-        {publishSuccess && (
-          <span className="pointer-events-none absolute top-2 left-2 z-20 rounded bg-red-600 px-1.5 py-0.5 text-xs font-semibold tracking-wide text-white uppercase">
-            Live
-          </span>
-        )}
-        {isOnline && (
-          <span className="pointer-events-none absolute top-2 right-2 z-20 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-xs font-medium text-white">
-            <Eye className="size-3.5" />
-            {viewers}
-          </span>
-        )}
-      </div>
+          <div className="bg-background flex w-full gap-2 p-2">
+            <Button className="flex-1" onClick={() => requestMedia("Screen")}>
+              <MonitorUp className="size-4" />
+              Share screen
+            </Button>
+            <Button className="flex-1" variant="secondary" onClick={() => requestMedia("Webcam")}>
+              <Webcam className="size-4" />
+              Share webcam
+            </Button>
+            <Button
+              className="flex-1"
+              variant="secondary"
+              onClick={() => setPreviewHidden((hidden) => !hidden)}
+            >
+              {previewHidden ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+              {previewHidden ? "Show preview" : "Hide preview"}
+            </Button>
+            <Button
+              variant={chatOpen ? "default" : "secondary"}
+              onClick={() => setChatOpen((open) => !open)}
+              aria-label={chatOpen ? "Hide chat" : "Show chat"}
+            >
+              <MessageSquare className="size-4" />
+            </Button>
+            {publishSuccess && (
+              <Button
+                className="flex-1"
+                variant="destructive"
+                onClick={() => void navigate({ to: "/" })}
+              >
+                End stream
+              </Button>
+            )}
+          </div>
+        </div>
 
-      <div className="bg-background flex w-full gap-2 p-2">
-        <Button className="flex-1" onClick={() => requestMedia("Screen")}>
-          <MonitorUp className="size-4" />
-          Share screen
-        </Button>
-        <Button className="flex-1" variant="secondary" onClick={() => requestMedia("Webcam")}>
-          <Webcam className="size-4" />
-          Share webcam
-        </Button>
-        <Button
-          className="flex-1"
-          variant="secondary"
-          onClick={() => setPreviewHidden((hidden) => !hidden)}
-        >
-          {previewHidden ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
-          {previewHidden ? "Show preview" : "Hide preview"}
-        </Button>
-        {publishSuccess && (
-          <Button
-            className="flex-1"
-            variant="destructive"
-            onClick={() => void navigate({ to: "/" })}
-          >
-            End stream
-          </Button>
+        {chatOpen && (
+          <aside className="w-72 shrink-0 border-l md:w-80">
+            <Chat channel={chatChannel} />
+          </aside>
         )}
       </div>
     </div>
