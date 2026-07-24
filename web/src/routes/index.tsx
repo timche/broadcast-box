@@ -255,7 +255,13 @@ function ObsGuide({
           Optional, for sub-second latency: in{" "}
           <span className="font-medium">Settings → Output</span> set the encoder to{" "}
           <code className="bg-muted rounded px-1 py-0.5">x264</code> and tune to{" "}
-          <code className="bg-muted rounded px-1 py-0.5">zerolatency</code>.
+          <code className="bg-muted rounded px-1 py-0.5">zerolatency</code>. On{" "}
+          <span className="font-medium">NVIDIA NVENC</span> set{" "}
+          <span className="font-medium">Tuning</span> to{" "}
+          <code className="bg-muted rounded px-1 py-0.5">Low Latency</code>; on{" "}
+          <span className="font-medium">Intel Quick Sync</span> set{" "}
+          <span className="font-medium">Latency</span> to{" "}
+          <code className="bg-muted rounded px-1 py-0.5">Ultra Low</code>.
         </li>
         <li>
           Press <span className="font-medium">Start Streaming</span> in OBS.
