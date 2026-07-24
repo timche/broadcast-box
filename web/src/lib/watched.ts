@@ -1,5 +1,5 @@
 const STORAGE_KEY = "watched-streams";
-const MAX_ENTRIES = 50;
+const MAX_ENTRIES = 10;
 
 /** Returns the most-recently-watched stream names (newest first). */
 export function getWatchedStreams(): string[] {
@@ -7,7 +7,7 @@ export function getWatchedStreams(): string[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     const parsed: unknown = raw === null ? [] : JSON.parse(raw);
     return Array.isArray(parsed)
-      ? parsed.filter((entry): entry is string => typeof entry === "string")
+      ? parsed.filter((entry): entry is string => typeof entry === "string").slice(0, MAX_ENTRIES)
       : [];
   } catch {
     return [];

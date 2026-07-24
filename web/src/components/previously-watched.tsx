@@ -3,6 +3,8 @@ import { X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
+import { useStreamOnline } from "@/hooks/use-stream-online";
+import { cn } from "@/lib/utils";
 import { getWatchedStreams, removeWatchedStream } from "@/lib/watched";
 
 interface PreviouslyWatchedProps {
@@ -46,28 +48,51 @@ export function PreviouslyWatched({
       ) : (
         <div className="flex flex-wrap gap-2">
           {streams.map((name) => (
-            <ButtonGroup key={name}>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="font-medium"
-                onClick={() => handleSelect(name)}
-              >
-                {name}
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="text-muted-foreground hover:text-foreground border-background/30 border-l px-2"
-                aria-label={`Remove ${name}`}
-                onClick={() => handleRemove(name)}
-              >
-                <X className="size-4" />
-              </Button>
-            </ButtonGroup>
+            <WatchedStreamChip
+              key={name}
+              name={name}
+              onSelect={() => handleSelect(name)}
+              onRemove={() => handleRemove(name)}
+            />
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+function WatchedStreamChip({
+  name,
+  onSelect,
+  onRemove,
+}: {
+  name: string;
+  onSelect: () => void;
+  onRemove: () => void;
+}) {
+  const isLive = useStreamOnline(name);
+
+  return (
+    <ButtonGroup>
+      <Button variant="secondary" size="sm" className="font-medium" onClick={onSelect}>
+        <span
+          className={cn(
+            "size-2 shrink-0 rounded-full",
+            isLive ? "bg-green-500" : "bg-muted-foreground/40",
+          )}
+          title={isLive ? "Live" : "Offline"}
+        />
+        {name}
+      </Button>
+      <Button
+        variant="secondary"
+        size="sm"
+        className="text-muted-foreground hover:text-foreground border-background/30 border-l px-2"
+        aria-label={`Remove ${name}`}
+        onClick={onRemove}
+      >
+        <X className="size-4" />
+      </Button>
+    </ButtonGroup>
   );
 }
