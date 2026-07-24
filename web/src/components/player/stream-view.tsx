@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { Plus, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { HeaderPortal } from "@/components/layout/header-portal";
 import { Player } from "@/components/player/player";
 import { PreviouslyWatched } from "@/components/previously-watched";
@@ -13,9 +13,24 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
 import { addWatchedStream } from "@/lib/watched";
 
 const HEADER_HEIGHT = "2.75rem";
+
+/** Split the streams into a balanced (as-square-as-possible) grid of rows. */
+function buildRows(streamKeys: string[]): string[][] {
+  const cols = Math.max(1, Math.ceil(Math.sqrt(streamKeys.length)));
+  const rows: string[][] = [];
+  for (let i = 0; i < streamKeys.length; i += cols) {
+    rows.push(streamKeys.slice(i, i + cols));
+  }
+  return rows;
+}
 
 export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   const navigate = useNavigate();
@@ -51,9 +66,7 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   };
 
   const isSingle = streamKeys.length === 1;
-  // Tile the streams into a balanced (as-square-as-possible) grid.
-  const cols = Math.max(1, Math.ceil(Math.sqrt(streamKeys.length)));
-  const rows = Math.max(1, Math.ceil(streamKeys.length / cols));
+  const rows = buildRows(streamKeys);
 
   return (
     <div className="w-full bg-black" style={{ height: `calc(100dvh - ${HEADER_HEIGHT})` }}>
@@ -67,35 +80,42 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
       {isSingle ? (
         <Player streamKey={streamKeys[0]} />
       ) : (
-        <div
-          className="grid h-full w-full gap-1.5 p-1.5"
-          style={{
-            gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-            gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
-          }}
-        >
-          {streamKeys.map((streamKey) => (
-            <div
-              key={streamKey}
-              className="flex min-h-0 flex-col overflow-hidden rounded-md bg-black"
-            >
-              <div className="flex h-6 shrink-0 items-center justify-between gap-2 bg-neutral-900 px-2 text-xs text-white">
-                <span className="truncate">{streamKey}</span>
-                <button
-                  type="button"
-                  className="rounded p-0.5 hover:bg-white/10"
-                  aria-label={`Remove ${streamKey}`}
-                  onClick={() => removeStream(streamKey)}
-                >
-                  <X className="size-3.5" />
-                </button>
-              </div>
-              <div className="relative min-h-0 flex-1">
-                <Player streamKey={streamKey} />
-              </div>
-            </div>
+        // Re-tiling on a stream set change is done by remounting the group
+        // (keyed on the stream list) so panel sizes reset to an even split.
+        <ResizablePanelGroup key={streamKeys.join("/")} orientation="vertical">
+          {rows.map((rowKeys, rowIndex) => (
+            <Fragment key={rowKeys.join("/")}>
+              {rowIndex > 0 && <ResizableHandle />}
+              <ResizablePanel minSize={80}>
+                <ResizablePanelGroup orientation="horizontal">
+                  {rowKeys.map((streamKey, colIndex) => (
+                    <Fragment key={streamKey}>
+                      {colIndex > 0 && <ResizableHandle />}
+                      <ResizablePanel minSize={80}>
+                        <div className="flex h-full flex-col overflow-hidden bg-black">
+                          <div className="flex h-6 shrink-0 items-center justify-between gap-2 bg-neutral-900 px-2 text-xs text-white">
+                            <span className="truncate">{streamKey}</span>
+                            <button
+                              type="button"
+                              className="rounded p-0.5 hover:bg-white/10"
+                              aria-label={`Remove ${streamKey}`}
+                              onClick={() => removeStream(streamKey)}
+                            >
+                              <X className="size-3.5" />
+                            </button>
+                          </div>
+                          <div className="relative min-h-0 flex-1">
+                            <Player streamKey={streamKey} />
+                          </div>
+                        </div>
+                      </ResizablePanel>
+                    </Fragment>
+                  ))}
+                </ResizablePanelGroup>
+              </ResizablePanel>
+            </Fragment>
           ))}
-        </div>
+        </ResizablePanelGroup>
       )}
 
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
