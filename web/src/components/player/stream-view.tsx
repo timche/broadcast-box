@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { MessageSquare, Plus, X } from "lucide-react";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { Chat } from "@/components/chat/chat";
 import { HeaderPortal } from "@/components/layout/header-portal";
 import { Player } from "@/components/player/player";
@@ -38,7 +38,11 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newStreamName, setNewStreamName] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
-  const [chatChannel, setChatChannel] = useState<RTCDataChannel | null>(null);
+  const [chatChannels, setChatChannels] = useState<Record<string, RTCDataChannel | null>>({});
+
+  const setChatChannelFor = useCallback((streamKey: string, channel: RTCDataChannel | null) => {
+    setChatChannels((current) => ({ ...current, [streamKey]: channel }));
+  }, []);
 
   // Remember every stream watched (used for "Previously watched").
   useEffect(() => {
@@ -79,69 +83,78 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
             <Plus className="size-4" />
             Add stream
           </Button>
-          {isSingle && (
-            <Button
-              size="sm"
-              variant={chatOpen ? "default" : "secondary"}
-              onClick={() => setChatOpen((open) => !open)}
-              aria-label={chatOpen ? "Hide chat" : "Show chat"}
-            >
-              <MessageSquare className="size-4" />
-              Chat
-            </Button>
-          )}
+          <Button
+            size="sm"
+            variant={chatOpen ? "default" : "secondary"}
+            onClick={() => setChatOpen((open) => !open)}
+            aria-label={chatOpen ? "Hide chat" : "Show chat"}
+          >
+            <MessageSquare className="size-4" />
+            Chat
+          </Button>
         </div>
       </HeaderPortal>
 
-      {isSingle ? (
-        <div className="flex size-full">
-          <div className="relative min-w-0 flex-1">
-            <Player streamKey={streamKeys[0]} onChatChannel={setChatChannel} />
-          </div>
-          {chatOpen && (
-            <aside className="w-72 shrink-0 border-l md:w-80">
-              <Chat channel={chatChannel} />
-            </aside>
+      <div className="flex size-full">
+        <div className="relative min-w-0 flex-1">
+          {isSingle ? (
+            <Player streamKey={streamKeys[0]} onChatChannel={(c) => setChatChannelFor(streamKeys[0], c)} />
+          ) : (
+            // Re-tiling on a stream set change is done by remounting the group
+            // (keyed on the stream list) so panel sizes reset to an even split.
+            <ResizablePanelGroup key={streamKeys.join("/")} orientation="vertical">
+              {rows.map((rowKeys, rowIndex) => (
+                <Fragment key={rowKeys.join("/")}>
+                  {rowIndex > 0 && <ResizableHandle />}
+                  <ResizablePanel minSize={80}>
+                    <ResizablePanelGroup orientation="horizontal">
+                      {rowKeys.map((streamKey, colIndex) => (
+                        <Fragment key={streamKey}>
+                          {colIndex > 0 && <ResizableHandle />}
+                          <ResizablePanel minSize={80}>
+                            <div className="flex h-full flex-col overflow-hidden bg-black">
+                              <div className="flex h-6 shrink-0 items-center justify-between gap-2 bg-neutral-900 px-2 text-xs text-white">
+                                <span className="truncate">{streamKey}</span>
+                                <button
+                                  type="button"
+                                  className="rounded p-0.5 hover:bg-white/10"
+                                  aria-label={`Remove ${streamKey}`}
+                                  onClick={() => removeStream(streamKey)}
+                                >
+                                  <X className="size-3.5" />
+                                </button>
+                              </div>
+                              <div className="relative min-h-0 flex-1">
+                                <Player
+                                  streamKey={streamKey}
+                                  onChatChannel={(c) => setChatChannelFor(streamKey, c)}
+                                />
+                              </div>
+                            </div>
+                          </ResizablePanel>
+                        </Fragment>
+                      ))}
+                    </ResizablePanelGroup>
+                  </ResizablePanel>
+                </Fragment>
+              ))}
+            </ResizablePanelGroup>
           )}
         </div>
-      ) : (
-        // Re-tiling on a stream set change is done by remounting the group
-        // (keyed on the stream list) so panel sizes reset to an even split.
-        <ResizablePanelGroup key={streamKeys.join("/")} orientation="vertical">
-          {rows.map((rowKeys, rowIndex) => (
-            <Fragment key={rowKeys.join("/")}>
-              {rowIndex > 0 && <ResizableHandle />}
-              <ResizablePanel minSize={80}>
-                <ResizablePanelGroup orientation="horizontal">
-                  {rowKeys.map((streamKey, colIndex) => (
-                    <Fragment key={streamKey}>
-                      {colIndex > 0 && <ResizableHandle />}
-                      <ResizablePanel minSize={80}>
-                        <div className="flex h-full flex-col overflow-hidden bg-black">
-                          <div className="flex h-6 shrink-0 items-center justify-between gap-2 bg-neutral-900 px-2 text-xs text-white">
-                            <span className="truncate">{streamKey}</span>
-                            <button
-                              type="button"
-                              className="rounded p-0.5 hover:bg-white/10"
-                              aria-label={`Remove ${streamKey}`}
-                              onClick={() => removeStream(streamKey)}
-                            >
-                              <X className="size-3.5" />
-                            </button>
-                          </div>
-                          <div className="relative min-h-0 flex-1">
-                            <Player streamKey={streamKey} />
-                          </div>
-                        </div>
-                      </ResizablePanel>
-                    </Fragment>
-                  ))}
-                </ResizablePanelGroup>
-              </ResizablePanel>
-            </Fragment>
-          ))}
-        </ResizablePanelGroup>
-      )}
+
+        {chatOpen && (
+          <aside className="flex w-72 shrink-0 flex-col border-l md:w-80">
+            {streamKeys.map((streamKey) => (
+              <div key={streamKey} className="min-h-0 flex-1 not-last:border-b">
+                <Chat
+                  title={isSingle ? undefined : streamKey}
+                  channel={chatChannels[streamKey] ?? null}
+                />
+              </div>
+            ))}
+          </aside>
+        )}
+      </div>
 
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
         <DialogContent>

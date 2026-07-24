@@ -53,10 +53,11 @@ function ChatLine({ message }: { message: ChatMessage }) {
 
 interface ChatProps {
   channel: RTCDataChannel | null;
+  title?: string;
   className?: string;
 }
 
-export function Chat({ channel, className }: ChatProps) {
+export function Chat({ channel, title = "Stream Chat", className }: ChatProps) {
   const { messages, status, sendMessage } = useChat(channel);
 
   const [nickname, setNickname] = useState(getDisplayName);
@@ -107,7 +108,9 @@ export function Chat({ channel, className }: ChatProps) {
   return (
     <div className={cn("bg-background flex size-full min-h-0 flex-col", className)}>
       <div className="flex h-10 shrink-0 items-center justify-between border-b px-3">
-        <span className="text-sm font-semibold">Stream Chat</span>
+        <span className="truncate text-sm font-semibold" title={title}>
+          {title}
+        </span>
         <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
           <span className={cn("size-2 rounded-full", statusColor)} />
           {STATUS_LABEL[status]}
