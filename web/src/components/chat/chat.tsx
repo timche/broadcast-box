@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, SendHorizontal } from "lucide-react";
+import { ChevronDown, ChevronRight, Pencil, SendHorizontal } from "lucide-react";
 import { type FormEvent, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -75,14 +75,17 @@ export function Chat({
 }: ChatProps) {
   const { messages, status, sendMessage } = useChat(channel);
 
-  const [nickname, setNickname] = useState(getDisplayName);
+  // `fixedName` (e.g. the broadcaster's stream name) seeds the default; the
+  // name stays changeable from the composer.
+  const [nickname, setNickname] = useState(() => fixedName ?? getDisplayName());
   const [nameDraft, setNameDraft] = useState("");
+  const [editingName, setEditingName] = useState(false);
   const [draft, setDraft] = useState("");
 
-  const trimmedNickname = (fixedName ?? nickname).trim();
+  const trimmedNickname = nickname.trim();
   const hasNickname = trimmedNickname.length > 0;
-  // A nickname is set once, up front — until then the message input is replaced
-  // by the nickname form and there is no way to change it afterwards.
+  // Until a nickname is set the message input is replaced by the nickname form.
+  const showNameForm = editingName || !hasNickname;
   const canSend = status === "connected" && draft.trim().length > 0 && hasNickname;
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
@@ -90,6 +93,11 @@ export function Chat({
     if (sendMessage(draft, trimmedNickname)) {
       setDraft("");
     }
+  };
+
+  const startEditingName = () => {
+    setNameDraft(nickname);
+    setEditingName(true);
   };
 
   const commitName = (event: FormEvent<HTMLFormElement>) => {
@@ -100,6 +108,7 @@ export function Chat({
     }
     setDisplayName(trimmed);
     setNickname(trimmed);
+    setEditingName(false);
   };
 
   const statusColor = useMemo(() => {
@@ -172,22 +181,11 @@ export function Chat({
           </MessageScrollerProvider>
 
           <div className="shrink-0 border-t p-3">
-            {hasNickname ? (
-              <form onSubmit={submit} className="flex items-center gap-2">
-                <Input
-                  value={draft}
-                  maxLength={MAX_MESSAGE_LENGTH}
-                  onChange={(event) => setDraft(event.target.value)}
-                  placeholder="Send a message"
-                  aria-label="Chat message"
-                />
-                <Button type="submit" size="icon" disabled={!canSend} aria-label="Send message">
-                  <SendHorizontal className="size-4" />
-                </Button>
-              </form>
-            ) : (
+            {showNameForm ? (
               <form onSubmit={commitName} className="flex flex-col gap-2">
-                <p className="text-muted-foreground text-xs">Set a nickname to join the chat.</p>
+                {!hasNickname && (
+                  <p className="text-muted-foreground text-xs">Set a nickname to join the chat.</p>
+                )}
                 <div className="flex items-center gap-2">
                   <Input
                     autoFocus
@@ -198,10 +196,41 @@ export function Chat({
                     aria-label="Nickname"
                   />
                   <Button type="submit" disabled={nameDraft.trim().length === 0}>
-                    Join
+                    {hasNickname ? "Save" : "Join"}
                   </Button>
+                  {hasNickname && (
+                    <Button type="button" variant="ghost" onClick={() => setEditingName(false)}>
+                      Cancel
+                    </Button>
+                  )}
                 </div>
               </form>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={startEditingName}
+                  className="text-muted-foreground hover:text-foreground mb-2 flex items-center gap-1 text-xs"
+                >
+                  <Pencil className="size-3" />
+                  <span>
+                    Chatting as{" "}
+                    <span className="text-foreground font-medium">{trimmedNickname}</span>
+                  </span>
+                </button>
+                <form onSubmit={submit} className="flex items-center gap-2">
+                  <Input
+                    value={draft}
+                    maxLength={MAX_MESSAGE_LENGTH}
+                    onChange={(event) => setDraft(event.target.value)}
+                    placeholder="Send a message"
+                    aria-label="Chat message"
+                  />
+                  <Button type="submit" size="icon" disabled={!canSend} aria-label="Send message">
+                    <SendHorizontal className="size-4" />
+                  </Button>
+                </form>
+              </>
             )}
           </div>
         </>
