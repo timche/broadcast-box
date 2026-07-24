@@ -160,6 +160,17 @@ export function Chat({ channel, className }: ChatProps) {
           </form>
         ) : (
           <>
+            <button
+              type="button"
+              onClick={startEditingName}
+              className="text-muted-foreground hover:text-foreground mb-2 flex items-center gap-1 text-xs"
+            >
+              <Pencil className="size-3" />
+              <span>
+                Chatting as <span className="text-foreground font-medium">{trimmedNickname}</span>
+              </span>
+            </button>
+
             <form onSubmit={submit} className="flex items-center gap-2">
               <Input
                 value={draft}
@@ -172,17 +183,6 @@ export function Chat({ channel, className }: ChatProps) {
                 <SendHorizontal className="size-4" />
               </Button>
             </form>
-
-            <button
-              type="button"
-              onClick={startEditingName}
-              className="text-muted-foreground hover:text-foreground mt-2 flex items-center gap-1 text-xs"
-            >
-              <Pencil className="size-3" />
-              <span>
-                Chatting as <span className="text-foreground font-medium">{trimmedNickname}</span>
-              </span>
-            </button>
           </>
         )}
       </div>
