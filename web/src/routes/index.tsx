@@ -14,15 +14,21 @@ export const Route = createFileRoute("/")({
 function Home() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"watch" | "share">("watch");
-  const [streamName, setStreamName] = useState(getLastStreamName);
+  const [streamName, setStreamName] = useState("");
+
+  // Prefill the last stream name only on the Stream tab; keep Watch empty.
+  const selectMode = (next: "watch" | "share") => {
+    setMode(next);
+    setStreamName(next === "share" ? getLastStreamName() : "");
+  };
 
   const submit = () => {
     const name = streamName.trim();
     if (name === "") {
       return;
     }
-    setLastStreamName(name);
     if (mode === "share") {
+      setLastStreamName(name);
       void navigate({ to: "/publish/$streamKey", params: { streamKey: name } });
     } else {
       void navigate({ to: "/$", params: { _splat: name } });
@@ -36,14 +42,14 @@ function Home() {
           <div className="grid grid-cols-2 gap-2 rounded-lg border p-1">
             <Button
               variant={mode === "watch" ? "default" : "ghost"}
-              onClick={() => setMode("watch")}
+              onClick={() => selectMode("watch")}
             >
               <Users className="size-4" />
               Watch
             </Button>
             <Button
               variant={mode === "share" ? "default" : "ghost"}
-              onClick={() => setMode("share")}
+              onClick={() => selectMode("share")}
             >
               <Video className="size-4" />
               Stream
