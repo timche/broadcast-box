@@ -14,11 +14,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { cn } from "@/lib/utils";
 import { addWatchedStream } from "@/lib/watched";
 
 const HEADER_HEIGHT = "2.75rem";
@@ -39,6 +36,8 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   const [newStreamName, setNewStreamName] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
   const [chatChannels, setChatChannels] = useState<Record<string, RTCDataChannel | null>>({});
+
+  const [collapsedChats, setCollapsedChats] = useState<Record<string, boolean>>({});
 
   const setChatChannelFor = useCallback((streamKey: string, channel: RTCDataChannel | null) => {
     setChatChannels((current) => ({ ...current, [streamKey]: channel }));
@@ -98,7 +97,10 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
       <div className="flex size-full">
         <div className="relative min-w-0 flex-1">
           {isSingle ? (
-            <Player streamKey={streamKeys[0]} onChatChannel={(c) => setChatChannelFor(streamKeys[0], c)} />
+            <Player
+              streamKey={streamKeys[0]}
+              onChatChannel={(c) => setChatChannelFor(streamKeys[0], c)}
+            />
           ) : (
             // Re-tiling on a stream set change is done by remounting the group
             // (keyed on the stream list) so panel sizes reset to an even split.
@@ -143,15 +145,29 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
         </div>
 
         {chatOpen && (
-          <aside className="flex w-72 shrink-0 flex-col border-l md:w-80">
-            {streamKeys.map((streamKey) => (
-              <div key={streamKey} className="min-h-0 flex-1 not-last:border-b">
-                <Chat
-                  title={isSingle ? undefined : streamKey}
-                  channel={chatChannels[streamKey] ?? null}
-                />
-              </div>
-            ))}
+          <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-l md:w-80">
+            {streamKeys.map((streamKey) => {
+              const collapsed = collapsedChats[streamKey] ?? false;
+              return (
+                <div
+                  key={streamKey}
+                  className={cn(
+                    "not-last:border-b",
+                    isSingle || !collapsed ? "min-h-0 flex-1" : "shrink-0",
+                  )}
+                >
+                  <Chat
+                    title={isSingle ? undefined : streamKey}
+                    channel={chatChannels[streamKey] ?? null}
+                    collapsible={!isSingle}
+                    collapsed={!isSingle && collapsed}
+                    onCollapsedChange={(next) =>
+                      setCollapsedChats((current) => ({ ...current, [streamKey]: next }))
+                    }
+                  />
+                </div>
+              );
+            })}
           </aside>
         )}
       </div>

@@ -1,4 +1,4 @@
-import { Pencil, SendHorizontal } from "lucide-react";
+import { ChevronDown, ChevronRight, Pencil, SendHorizontal } from "lucide-react";
 import { type FormEvent, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,9 +55,20 @@ interface ChatProps {
   channel: RTCDataChannel | null;
   title?: string;
   className?: string;
+  /** When set, the header becomes a toggle that collapses the chat body. */
+  collapsible?: boolean;
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
 }
 
-export function Chat({ channel, title = "Stream Chat", className }: ChatProps) {
+export function Chat({
+  channel,
+  title = "Stream Chat",
+  className,
+  collapsible = false,
+  collapsed = false,
+  onCollapsedChange,
+}: ChatProps) {
   const { messages, status, sendMessage } = useChat(channel);
 
   const [nickname, setNickname] = useState(getDisplayName);
@@ -105,90 +116,116 @@ export function Chat({ channel, title = "Stream Chat", className }: ChatProps) {
     }
   }, [status]);
 
-  return (
-    <div className={cn("bg-background flex size-full min-h-0 flex-col", className)}>
-      <div className="flex h-10 shrink-0 items-center justify-between border-b px-3">
+  const header = (
+    <>
+      <span className="flex min-w-0 items-center gap-1.5">
+        {collapsible &&
+          (collapsed ? (
+            <ChevronRight className="size-4 shrink-0" />
+          ) : (
+            <ChevronDown className="size-4 shrink-0" />
+          ))}
         <span className="truncate text-sm font-semibold" title={title}>
           {title}
         </span>
-        <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
-          <span className={cn("size-2 rounded-full", statusColor)} />
-          {STATUS_LABEL[status]}
-        </span>
-      </div>
+      </span>
+      <span className="text-muted-foreground flex items-center gap-1.5 text-xs">
+        <span className={cn("size-2 rounded-full", statusColor)} />
+        {STATUS_LABEL[status]}
+      </span>
+    </>
+  );
 
-      <MessageScrollerProvider autoScroll defaultScrollPosition="end">
-        <MessageScroller className="min-h-0 flex-1">
-          <MessageScrollerViewport className="py-2">
-            <MessageScrollerContent className="gap-1.5">
-              {messages.length === 0 ? (
-                <div className="text-muted-foreground px-3 py-6 text-center text-xs">
-                  {status === "connected"
-                    ? "No messages yet. Say hello!"
-                    : "Waiting for the chat connection…"}
+  return (
+    <div className={cn("bg-background flex size-full min-h-0 flex-col", className)}>
+      {collapsible ? (
+        <button
+          type="button"
+          onClick={() => onCollapsedChange?.(!collapsed)}
+          aria-expanded={!collapsed}
+          className="hover:bg-muted/50 flex h-10 shrink-0 items-center justify-between gap-2 border-b px-3 text-left transition-colors"
+        >
+          {header}
+        </button>
+      ) : (
+        <div className="flex h-10 shrink-0 items-center justify-between border-b px-3">
+          {header}
+        </div>
+      )}
+
+      {collapsed ? null : (
+        <>
+          <MessageScrollerProvider autoScroll defaultScrollPosition="end">
+            <MessageScroller className="min-h-0 flex-1">
+              <MessageScrollerViewport className="py-2">
+                <MessageScrollerContent className="gap-1.5">
+                  {messages.length === 0 ? (
+                    <div className="text-muted-foreground px-3 py-6 text-center text-xs">
+                      {status === "connected"
+                        ? "No messages yet. Say hello!"
+                        : "Waiting for the chat connection…"}
+                    </div>
+                  ) : (
+                    messages.map((message) => <ChatLine key={message.id} message={message} />)
+                  )}
+                </MessageScrollerContent>
+              </MessageScrollerViewport>
+              <MessageScrollerButton />
+            </MessageScroller>
+          </MessageScrollerProvider>
+
+          <div className="shrink-0 border-t p-3">
+            {showNameForm ? (
+              <form onSubmit={commitName} className="flex flex-col gap-2">
+                {!hasNickname && (
+                  <p className="text-muted-foreground text-xs">Set a nickname to join the chat.</p>
+                )}
+                <div className="flex items-center gap-2">
+                  <Input
+                    autoFocus
+                    value={nameDraft}
+                    maxLength={MAX_DISPLAY_NAME_LENGTH}
+                    onChange={(event) => setNameDraft(event.target.value)}
+                    placeholder="Nickname"
+                    aria-label="Nickname"
+                  />
+                  <Button type="submit" disabled={nameDraft.trim().length === 0}>
+                    {hasNickname ? "Save" : "Join"}
+                  </Button>
+                  {hasNickname && (
+                    <Button type="button" variant="ghost" onClick={() => setEditingName(false)}>
+                      Cancel
+                    </Button>
+                  )}
                 </div>
-              ) : (
-                messages.map((message) => <ChatLine key={message.id} message={message} />)
-              )}
-            </MessageScrollerContent>
-          </MessageScrollerViewport>
-          <MessageScrollerButton />
-        </MessageScroller>
-      </MessageScrollerProvider>
-
-      <div className="shrink-0 border-t p-3">
-        {showNameForm ? (
-          <form onSubmit={commitName} className="flex flex-col gap-2">
-            {!hasNickname && (
-              <p className="text-muted-foreground text-xs">Set a nickname to join the chat.</p>
-            )}
-            <div className="flex items-center gap-2">
-              <Input
-                autoFocus
-                value={nameDraft}
-                maxLength={MAX_DISPLAY_NAME_LENGTH}
-                onChange={(event) => setNameDraft(event.target.value)}
-                placeholder="Nickname"
-                aria-label="Nickname"
-              />
-              <Button type="submit" disabled={nameDraft.trim().length === 0}>
-                {hasNickname ? "Save" : "Join"}
-              </Button>
-              {hasNickname && (
-                <Button type="button" variant="ghost" onClick={() => setEditingName(false)}>
-                  Cancel
+              </form>
+            ) : (
+              <form onSubmit={submit} className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  onClick={startEditingName}
+                  aria-label="Change nickname"
+                  title={`Chatting as ${trimmedNickname}`}
+                >
+                  <Pencil className="size-4" />
                 </Button>
-              )}
-            </div>
-          </form>
-        ) : (
-          <>
-            <button
-              type="button"
-              onClick={startEditingName}
-              className="text-muted-foreground hover:text-foreground mb-2 flex items-center gap-1 text-xs"
-            >
-              <Pencil className="size-3" />
-              <span>
-                Chatting as <span className="text-foreground font-medium">{trimmedNickname}</span>
-              </span>
-            </button>
-
-            <form onSubmit={submit} className="flex items-center gap-2">
-              <Input
-                value={draft}
-                maxLength={MAX_MESSAGE_LENGTH}
-                onChange={(event) => setDraft(event.target.value)}
-                placeholder="Send a message"
-                aria-label="Chat message"
-              />
-              <Button type="submit" size="icon" disabled={!canSend} aria-label="Send message">
-                <SendHorizontal className="size-4" />
-              </Button>
-            </form>
-          </>
-        )}
-      </div>
+                <Input
+                  value={draft}
+                  maxLength={MAX_MESSAGE_LENGTH}
+                  onChange={(event) => setDraft(event.target.value)}
+                  placeholder="Send a message"
+                  aria-label="Chat message"
+                />
+                <Button type="submit" size="icon" disabled={!canSend} aria-label="Send message">
+                  <SendHorizontal className="size-4" />
+                </Button>
+              </form>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
