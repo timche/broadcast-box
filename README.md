@@ -168,7 +168,7 @@ The repository includes a few small examples and integration helpers:
 
 ## Getting Started
 
-Broadcast Box is made up of two parts. The server is written in Go and is in charge of ingesting and broadcasting WebRTC. The frontend is in react and connects to the Go backend. The Go server can be used to serve the HTML/CSS/JS directly. Use the following instructions to build from source or utilize [Docker](#docker) / [Docker Compose](#docker-compose).
+Broadcast Box is made up of two parts. The server is written in Go and is in charge of ingesting and broadcasting WebRTC. The frontend is a React single-page app that connects to the Go backend. The Go server can be used to serve the HTML/CSS/JS directly. Use the following instructions to build from source or utilize [Docker](#docker) / [Docker Compose](#docker-compose).
 
 ### Configuring
 
@@ -181,29 +181,40 @@ If you only want the backend API or CLI helpers without serving the built fronte
 
 #### Frontend
 
-The frontend is a TypeScript + Vite app (TanStack Router, TanStack Query, shadcn/Base UI). Dependencies are installed by running `bun install` in the `web` directory.
+The frontend in [`web/`](./web) is a from-scratch rewrite on a modern, type-safe stack:
+
+- **TypeScript** + **Vite** with **Bun** as the package manager
+- **TanStack Router** (file-based routes in `web/src/routes`) and **TanStack Query**
+- **ofetch** as the typed API client (`web/src/lib`) instead of plain `fetch`
+- **shadcn/ui** components built on **Base UI**, **Tailwind CSS v4**, the **Inter** font, and **lucide** icons
+- **oxlint** + **oxfmt** for linting and formatting (config from `@timche/oxc-configs`)
+
+It ships the browser publisher (WHIP), the player and multi-view (WHEP), and the admin console. The
+WebRTC negotiation and the SSE status/telemetry channel live in `web/src/lib/webrtc`.
+
+Install dependencies with `bun install` in the `web` directory, then:
 
 - `bun run build` builds production assets into `web/build`
 - `bun run dev` runs the Vite dev server and proxies `/api` to the backend
 - `bun run host` runs the same Vite dev server on your local network
+- `bun run typecheck` type-checks the project
 - `bun run lint` / `bun run format` run oxlint and oxfmt
+
+> Streams you watch are remembered locally (in `localStorage`) and shown under **Previously watched**,
+> which is handy when `DISABLE_STATUS` is set and live stream discovery is unavailable.
 
 If everything is successful, you should see output similar to:
 
 ```console
-> broadcast-box@0.1.0 build
-> vite build
-
-[dotenv@17.2.3] injecting env (0) from ../.env.development,../.env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+$ bun run build
+$ tsr generate && tsc --noEmit && vite build
 Target Backend: http://localhost:8080
-vite v6.4.1 building for production...
-✓ 724 modules transformed.
-build/index.html                       0.84 kB │ gzip:  0.49 kB
-build/assets/index-BZVYZNKC.css       20.37 kB │ gzip:  4.82 kB
-build/assets/index-BeQC1JnS.js         1.43 kB │ gzip:  0.69 kB
-build/assets/components-BcOZaJ_1.js   63.11 kB │ gzip: 16.08 kB
-build/assets/node-DpLsG32O.js        239.39 kB │ gzip: 75.76 kB
-✓ built in 601ms
+vite v8.1.5 building client environment for production...
+✓ 2174 modules transformed.
+build/index.html                     1.40 kB │ gzip:  0.60 kB
+build/assets/index-*.css            31.19 kB │ gzip:  6.67 kB
+build/assets/index-*.js            261.15 kB │ gzip: 83.11 kB
+✓ built in 1.2s
 ```
 
 #### Backend

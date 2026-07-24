@@ -1,8 +1,7 @@
-name: Node Lint
+name: Web Lint
+
 on:
   push:
-    branches:
-      - main
     paths:
       - 'web/**'
   pull_request:
@@ -15,16 +14,14 @@ defaults:
 
 jobs:
   lint:
-    name: Lint
+    name: Typecheck & Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: 'lts/*'
-          cache: 'npm'
-          cache-dependency-path: web/package-lock.json
+          bun-version: latest
 
-      - run: npm ci
-      - run: npm run lint
-    # - run: npm test #TODO add tests
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun run lint

@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
 import { Toast } from "@base-ui/react/toast";
 import { X } from "lucide-react";
+import type { ReactNode } from "react";
 import { toastManager } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +25,7 @@ function ToastList() {
       key={toast.id}
       toast={toast}
       className={cn(
-        "flex items-start gap-3 rounded-md border bg-card p-3 text-sm shadow-lg transition-all data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
+        "bg-card flex items-start gap-3 rounded-md border p-3 text-sm shadow-lg transition-all data-[ending-style]:opacity-0 data-[starting-style]:opacity-0",
         toast.type === "error" && "border-destructive/60",
         toast.type === "success" && "border-emerald-500/60",
       )}

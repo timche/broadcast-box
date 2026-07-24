@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { Copy, Eye, EyeOff, MonitorUp, Webcam } from "lucide-react";
-import { addPublishTransceivers, negotiateWhip } from "@/lib/webrtc/whip";
-import { toast } from "@/lib/toast";
-import type { StreamStatus } from "@/lib/types";
+import { Check, Copy, Eye, EyeOff, MonitorUp, Webcam } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { HeaderPortal } from "@/components/layout/header-portal";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { toast } from "@/lib/toast";
+import type { StreamStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { addPublishTransceivers, negotiateWhip } from "@/lib/webrtc/whip";
 
 const HEADER_HEIGHT = "2.75rem";
 
@@ -61,6 +62,7 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
   const [previewHidden, setPreviewHidden] = useState(false);
   const [isOnline, setIsOnline] = useState(false);
   const [viewers, setViewers] = useState(0);
+  const [copied, setCopied] = useState(false);
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -72,7 +74,10 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
 
   const copyShareUrl = () => {
     void navigator.clipboard.writeText(shareUrl).then(
-      () => toast.success("Stream URL copied."),
+      () => {
+        setCopied(true);
+        window.setTimeout(() => setCopied(false), 1500);
+      },
       () => toast.error("Could not copy the stream URL."),
     );
   };
@@ -244,8 +249,14 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
       style={{ height: `calc(100dvh - ${HEADER_HEIGHT})` }}
     >
       <HeaderPortal>
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <span className="max-w-[40vw] truncate">{shareUrl}</span>
+        <div className="flex items-center gap-1">
+          <Input
+            readOnly
+            value={shareUrl}
+            onFocus={(event) => event.currentTarget.select()}
+            className="h-7 w-56 max-w-[45vw] text-xs"
+            aria-label="Stream URL"
+          />
           <Button
             size="icon"
             variant="ghost"
@@ -253,7 +264,7 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
             onClick={copyShareUrl}
             aria-label="Copy stream URL"
           >
-            <Copy className="size-4" />
+            {copied ? <Check className="size-4 text-emerald-500" /> : <Copy className="size-4" />}
           </Button>
         </div>
       </HeaderPortal>
@@ -268,7 +279,7 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
           className={cn("size-full object-contain", previewHidden && "hidden")}
         />
         {previewHidden && (
-          <div className="flex size-full items-center justify-center text-muted-foreground">
+          <div className="text-muted-foreground flex size-full items-center justify-center">
             Preview hidden
           </div>
         )}
@@ -286,7 +297,7 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
         )}
       </div>
 
-      <div className="flex w-full flex-wrap gap-2 bg-background p-2">
+      <div className="bg-background flex w-full gap-2 p-2">
         <Button className="flex-1" onClick={() => requestMedia("Screen")}>
           <MonitorUp className="size-4" />
           Share screen
@@ -295,12 +306,20 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
           <Webcam className="size-4" />
           Share webcam
         </Button>
-        <Button variant="outline" onClick={() => setPreviewHidden((hidden) => !hidden)}>
+        <Button
+          className="flex-1"
+          variant="secondary"
+          onClick={() => setPreviewHidden((hidden) => !hidden)}
+        >
           {previewHidden ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
           {previewHidden ? "Show preview" : "Hide preview"}
         </Button>
         {publishSuccess && (
-          <Button variant="destructive" onClick={() => void navigate({ to: "/" })}>
+          <Button
+            className="flex-1"
+            variant="destructive"
+            onClick={() => void navigate({ to: "/" })}
+          >
             End stream
           </Button>
         )}

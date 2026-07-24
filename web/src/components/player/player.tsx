@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
 import { Eye, X } from "lucide-react";
-import { setupWhepConnection } from "@/lib/webrtc/whep";
+import { useEffect, useRef, useState } from "react";
+import { StatusMessage } from "@/components/player/status-message";
 import { toast } from "@/lib/toast";
 import type { StreamState, StreamStatus } from "@/lib/types";
-import { StatusMessage } from "@/components/player/status-message";
+import { setupWhepConnection } from "@/lib/webrtc/whep";
 
 interface PlayerProps {
   streamKey: string;

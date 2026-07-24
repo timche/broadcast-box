@@ -1,10 +1,10 @@
-import { useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Users, Video } from "lucide-react";
+import { useState } from "react";
 import { PreviouslyWatched } from "@/components/previously-watched";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -28,14 +28,9 @@ function Home() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl px-4 pt-12">
+    <div className="mx-auto max-w-3xl px-4 pt-12">
       <Card className="py-8">
         <CardContent className="flex flex-col gap-4">
-          <div>
-            <h1 className="text-4xl font-light">Broadcast Box</h1>
-            <p className="text-muted-foreground">Real-time WebRTC streaming.</p>
-          </div>
-
           <div className="grid grid-cols-2 gap-2 rounded-lg border p-1">
             <Button
               variant={mode === "watch" ? "default" : "ghost"}
@@ -56,7 +51,9 @@ function Home() {
           <div className="flex flex-col gap-2">
             <Input
               autoFocus
-              placeholder={mode === "share" ? "Choose a stream name" : "Enter a stream name to watch"}
+              placeholder={
+                mode === "share" ? "Choose a stream name" : "Enter a stream name to watch"
+              }
               value={streamName}
               onChange={(event) => setStreamName(event.target.value)}
               onKeyUp={(event) => {

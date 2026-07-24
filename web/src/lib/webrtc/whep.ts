@@ -1,5 +1,5 @@
-import type { RefObject } from "react";
 import { parseLinkHeader } from "@web3-storage/parse-link-header";
+import type { RefObject } from "react";
 import { api, bearer } from "@/lib/api";
 import type { StreamStatus } from "@/lib/types";
 

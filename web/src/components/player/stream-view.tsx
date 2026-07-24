@@ -1,11 +1,10 @@
-import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
+import { useEffect, useState } from "react";
+import { HeaderPortal } from "@/components/layout/header-portal";
 import { Player } from "@/components/player/player";
 import { PreviouslyWatched } from "@/components/previously-watched";
-import { HeaderPortal } from "@/components/layout/header-portal";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { addWatchedStream } from "@/lib/watched";
 
 const HEADER_HEIGHT = "2.75rem";

@@ -1,7 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
-import { History } from "lucide-react";
-import { getWatchedStreams } from "@/lib/watched";
 import { Button } from "@/components/ui/button";
+import { getWatchedStreams } from "@/lib/watched";
 
 interface PreviouslyWatchedProps {
   showHeader?: boolean;
@@ -11,7 +10,11 @@ interface PreviouslyWatchedProps {
   onSelect?: (streamName: string) => void;
 }
 
-export function PreviouslyWatched({ showHeader = true, exclude, onSelect }: PreviouslyWatchedProps) {
+export function PreviouslyWatched({
+  showHeader = true,
+  exclude,
+  onSelect,
+}: PreviouslyWatchedProps) {
   const navigate = useNavigate();
 
   const excluded = new Set((exclude ?? []).map((name) => name.toLowerCase()));
@@ -27,12 +30,7 @@ export function PreviouslyWatched({ showHeader = true, exclude, onSelect }: Prev
 
   return (
     <div className="flex flex-col gap-2">
-      {showHeader && (
-        <h2 className="mb-2 flex items-center gap-2 text-2xl font-light">
-          <History className="size-5" />
-          Previously watched
-        </h2>
-      )}
+      {showHeader && <h2 className="text-lg font-semibold tracking-tight">Previously watched</h2>}
 
       {streams.length === 0 ? (
         <p className="text-muted-foreground py-2 text-center">No previously watched streams yet.</p>
