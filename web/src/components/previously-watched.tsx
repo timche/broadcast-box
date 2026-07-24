@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
 import { getWatchedStreams, removeWatchedStream } from "@/lib/watched";
 
 interface PreviouslyWatchedProps {
@@ -43,25 +44,27 @@ export function PreviouslyWatched({
       {streams.length === 0 ? (
         <p className="text-muted-foreground py-2 text-center">No previously watched streams yet.</p>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap gap-2">
           {streams.map((name) => (
-            <div key={name} className="flex items-center gap-2">
+            <ButtonGroup key={name}>
               <Button
                 variant="secondary"
-                className="flex-1 justify-center py-3 font-medium"
+                size="sm"
+                className="font-medium"
                 onClick={() => handleSelect(name)}
               >
                 {name}
               </Button>
               <Button
-                variant="ghost"
-                size="icon"
+                variant="secondary"
+                size="sm"
+                className="text-muted-foreground hover:text-foreground border-background/30 border-l px-2"
                 aria-label={`Remove ${name}`}
                 onClick={() => handleRemove(name)}
               >
                 <X className="size-4" />
               </Button>
-            </div>
+            </ButtonGroup>
           ))}
         </div>
       )}

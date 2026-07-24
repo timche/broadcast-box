@@ -258,10 +258,9 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
           <InputGroupInput
             readOnly
             value={shareUrl}
-            size={shareUrl.length}
             onFocus={(event) => event.currentTarget.select()}
             aria-label="Stream URL"
-            className="w-auto flex-none text-xs"
+            className="field-sizing-content w-auto flex-none px-2 text-xs"
           />
           <InputGroupAddon align="inline-end">
             <InputGroupButton size="icon-xs" onClick={copyShareUrl} aria-label="Copy stream URL">
