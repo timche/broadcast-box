@@ -1,5 +1,6 @@
 import { createRootRoute, Link, Outlet } from "@tanstack/react-router";
 import { HEADER_ACTIONS_ID } from "@/components/layout/header-portal";
+import { SITE_NAME } from "@/lib/site";
 
 export const HEADER_HEIGHT_REM = 2.75;
 
@@ -12,7 +13,7 @@ function RootLayout() {
     <div className="flex min-h-screen flex-col">
       <header className="bg-card/80 fixed inset-x-0 top-0 z-40 flex h-11 items-center gap-2 border-b px-3 backdrop-blur">
         <Link to="/" className="shrink-0 text-sm font-semibold tracking-tight">
-          Broadcast Box
+          {SITE_NAME}
         </Link>
         <div id={HEADER_ACTIONS_ID} className="ml-auto flex min-w-0 items-center gap-2" />
       </header>
