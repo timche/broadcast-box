@@ -1,6 +1,8 @@
 import { useNavigate } from "@tanstack/react-router";
+import { X } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { getWatchedStreams } from "@/lib/watched";
+import { getWatchedStreams, removeWatchedStream } from "@/lib/watched";
 
 interface PreviouslyWatchedProps {
   showHeader?: boolean;
@@ -16,9 +18,10 @@ export function PreviouslyWatched({
   onSelect,
 }: PreviouslyWatchedProps) {
   const navigate = useNavigate();
+  const [items, setItems] = useState(getWatchedStreams);
 
   const excluded = new Set((exclude ?? []).map((name) => name.toLowerCase()));
-  const streams = getWatchedStreams().filter((name) => !excluded.has(name.toLowerCase()));
+  const streams = items.filter((name) => !excluded.has(name.toLowerCase()));
 
   const handleSelect = (streamName: string) => {
     if (onSelect) {
@@ -26,6 +29,11 @@ export function PreviouslyWatched({
       return;
     }
     void navigate({ to: "/$", params: { _splat: streamName } });
+  };
+
+  const handleRemove = (streamName: string) => {
+    removeWatchedStream(streamName);
+    setItems(getWatchedStreams());
   };
 
   return (
@@ -37,14 +45,23 @@ export function PreviouslyWatched({
       ) : (
         <div className="flex flex-col gap-2">
           {streams.map((name) => (
-            <Button
-              key={name}
-              variant="secondary"
-              className="justify-center py-3 font-medium"
-              onClick={() => handleSelect(name)}
-            >
-              {name}
-            </Button>
+            <div key={name} className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                className="flex-1 justify-center py-3 font-medium"
+                onClick={() => handleSelect(name)}
+              >
+                {name}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={`Remove ${name}`}
+                onClick={() => handleRemove(name)}
+              >
+                <X className="size-4" />
+              </Button>
+            </div>
           ))}
         </div>
       )}

@@ -26,3 +26,9 @@ export function addWatchedStream(name: string): void {
   ];
   localStorage.setItem(STORAGE_KEY, JSON.stringify(next.slice(0, MAX_ENTRIES)));
 }
+
+/** Removes a stream name from the watched list. */
+export function removeWatchedStream(name: string): void {
+  const next = getWatchedStreams().filter((entry) => entry.toLowerCase() !== name.toLowerCase());
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+}
