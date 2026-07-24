@@ -5,8 +5,16 @@ import { PreviouslyWatched } from "@/components/previously-watched";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import { toast } from "@/components/ui/toast";
+import { useStreamOnline } from "@/hooks/use-stream-online";
 import { getLastStreamName, setLastStreamName } from "@/lib/last-stream";
+import { cn } from "@/lib/utils";
 
 type HomeTab = "watch" | "stream" | "obs";
 
@@ -33,6 +41,15 @@ function Home() {
     setStreamName(next === "watch" ? "" : getLastStreamName());
   };
 
+  const watchStream = () => {
+    const name = streamName.trim();
+    if (name === "") {
+      return;
+    }
+    setLastStreamName(name);
+    void navigate({ to: "/$", params: { _splat: name } });
+  };
+
   const submit = () => {
     const name = streamName.trim();
     if (name === "") {
@@ -54,6 +71,7 @@ function Home() {
             <Button
               variant={tab === "watch" ? "default" : "ghost"}
               onClick={() => selectTab("watch")}
+              className="h-auto flex-col gap-1 py-2 text-center text-xs leading-tight whitespace-normal sm:text-sm"
             >
               <Users className="size-4" />
               Watch
@@ -61,18 +79,27 @@ function Home() {
             <Button
               variant={tab === "stream" ? "default" : "ghost"}
               onClick={() => selectTab("stream")}
+              className="h-auto flex-col gap-1 py-2 text-center text-xs leading-tight whitespace-normal sm:text-sm"
             >
               <Video className="size-4" />
-              Stream
+              Stream with Browser
             </Button>
-            <Button variant={tab === "obs" ? "default" : "ghost"} onClick={() => selectTab("obs")}>
+            <Button
+              variant={tab === "obs" ? "default" : "ghost"}
+              onClick={() => selectTab("obs")}
+              className="h-auto flex-col gap-1 py-2 text-center text-xs leading-tight whitespace-normal sm:text-sm"
+            >
               <BookOpen className="size-4" />
-              OBS Guide
+              Stream with OBS
             </Button>
           </div>
 
           {tab === "obs" ? (
-            <ObsGuide />
+            <ObsGuide
+              streamName={streamName}
+              onStreamNameChange={setStreamName}
+              onWatch={watchStream}
+            />
           ) : (
             <>
               <div className="flex flex-col gap-2">
@@ -101,25 +128,74 @@ function Home() {
   );
 }
 
-function ObsGuide() {
+function CopyField({ value, label }: { value: string; label: string }) {
   const [copied, setCopied] = useState(false);
-  const whipUrl = `${window.location.origin}/api/whip`;
 
-  const copyWhipUrl = () => {
-    void navigator.clipboard.writeText(whipUrl).then(
+  const copy = () => {
+    if (value === "") {
+      return;
+    }
+    void navigator.clipboard.writeText(value).then(
       () => {
         setCopied(true);
         window.setTimeout(() => setCopied(false), 1500);
       },
-      () => toast.add({ description: "Could not copy the URL.", type: "error" }),
+      () => toast.add({ description: "Could not copy.", type: "error" }),
     );
   };
 
   return (
-    <div className="flex flex-col gap-3">
-      <p className="text-muted-foreground text-sm">
-        Broadcast to Broadcast Box from OBS over WebRTC (WHIP).
-      </p>
+    <InputGroup className="mt-1.5 h-8 min-w-0">
+      <InputGroupInput
+        readOnly
+        value={value}
+        onFocus={(event) => event.currentTarget.select()}
+        aria-label={label}
+        className="min-w-0 px-2 text-xs"
+      />
+      <InputGroupAddon align="inline-end">
+        <InputGroupButton
+          size="icon-xs"
+          onClick={copy}
+          disabled={value === ""}
+          aria-label={`Copy ${label.toLowerCase()}`}
+        >
+          {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+        </InputGroupButton>
+      </InputGroupAddon>
+    </InputGroup>
+  );
+}
+
+function ObsGuide({
+  streamName,
+  onStreamNameChange,
+  onWatch,
+}: {
+  streamName: string;
+  onStreamNameChange: (value: string) => void;
+  onWatch: () => void;
+}) {
+  const whipUrl = `${window.location.origin}/api/whip`;
+  const trimmedName = streamName.trim();
+  // Poll the stream status so the user can see OBS connect after they hit Start.
+  const isLive = useStreamOnline(trimmedName);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <Input
+          autoFocus
+          placeholder="Choose a stream name"
+          value={streamName}
+          onChange={(event) => onStreamNameChange(event.target.value)}
+          onKeyUp={(event) => {
+            if (event.key === "Enter") {
+              onWatch();
+            }
+          }}
+        />
+      </div>
 
       <ol className="flex list-decimal flex-col gap-3 ps-5 text-sm">
         <li>
@@ -131,23 +207,11 @@ function ObsGuide() {
         </li>
         <li>
           Set <span className="font-medium">Server</span> to:
-          <div className="mt-1.5 flex items-center gap-2">
-            <code className="bg-muted min-w-0 flex-1 truncate rounded px-2 py-1 text-xs">
-              {whipUrl}
-            </code>
-            <Button
-              size="icon-sm"
-              variant="secondary"
-              onClick={copyWhipUrl}
-              aria-label="Copy server URL"
-            >
-              {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-            </Button>
-          </div>
+          <CopyField value={whipUrl} label="Server URL" />
         </li>
         <li>
-          Set <span className="font-medium">Stream Key</span> to any name you like. That name{" "}
-          <span className="font-medium">is your stream</span> — viewers watch it by the same name.
+          Set <span className="font-medium">Stream Key</span> to your stream name:
+          <CopyField value={trimmedName} label="Stream key" />
         </li>
         <li>
           Optional, for sub-second latency: in{" "}
@@ -156,13 +220,33 @@ function ObsGuide() {
           <code className="bg-muted rounded px-1 py-0.5">zerolatency</code>.
         </li>
         <li>
-          Press <span className="font-medium">Start Streaming</span>, then open{" "}
-          <code className="bg-muted rounded px-1 py-0.5">
-            {window.location.origin}/&lt;stream name&gt;
-          </code>{" "}
-          to watch.
+          Press <span className="font-medium">Start Streaming</span> in OBS.
         </li>
       </ol>
+
+      <div className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
+        <span
+          className={cn(
+            "size-2.5 shrink-0 rounded-full",
+            trimmedName === ""
+              ? "bg-muted-foreground/40"
+              : isLive
+                ? "bg-green-500"
+                : "animate-pulse bg-yellow-400",
+          )}
+        />
+        <span className="text-muted-foreground">
+          {trimmedName === ""
+            ? "Enter a stream name to check its status."
+            : isLive
+              ? "Your stream is live — OBS is connected."
+              : "Waiting for OBS… press Start Streaming."}
+        </span>
+      </div>
+
+      <Button onClick={onWatch} disabled={trimmedName === ""}>
+        Go to stream and chat
+      </Button>
     </div>
   );
 }
