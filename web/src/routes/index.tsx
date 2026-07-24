@@ -1,7 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { BookOpen, Check, Copy, Users, Video } from "lucide-react";
+import { BookOpen, Check, Copy, Info, Users, Video } from "lucide-react";
 import { useState } from "react";
 import { PreviouslyWatched } from "@/components/previously-watched";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,7 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group";
+import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/toast";
 import { useStreamOnline } from "@/hooks/use-stream-online";
 import { getLastStreamName, setLastStreamName } from "@/lib/last-stream";
@@ -102,8 +104,12 @@ function Home() {
             />
           ) : (
             <>
+              {tab === "stream" && <BrowserStreamAlert />}
+
               <div className="flex flex-col gap-2">
+                <Label htmlFor="stream-name">Stream name</Label>
                 <Input
+                  id="stream-name"
                   autoFocus
                   placeholder={isWatch ? "Enter a stream name to watch" : "Choose a stream name"}
                   value={streamName}
@@ -119,12 +125,40 @@ function Home() {
                 </Button>
               </div>
 
-              <PreviouslyWatched />
+              {isWatch && <PreviouslyWatched />}
             </>
           )}
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function BrowserStreamAlert() {
+  return (
+    <Alert>
+      <Info />
+      <AlertTitle>Best for quick, casual streams</AlertTitle>
+      <AlertDescription>
+        Share your screen, a tab, or your webcam in a couple of clicks — no setup needed. For
+        fast-paced content like games, or the highest quality (1080p60), use{" "}
+        <span className="font-medium">Stream with OBS</span> instead.
+      </AlertDescription>
+    </Alert>
+  );
+}
+
+function ObsStreamAlert() {
+  return (
+    <Alert>
+      <Info />
+      <AlertTitle>Best for high quality and games</AlertTitle>
+      <AlertDescription>
+        OBS gives you full control — high bitrate, 60fps, scenes and overlays — so it's the right
+        choice for games and anything fast-paced. For a quick share,{" "}
+        <span className="font-medium">Stream with Browser</span> is faster to set up.
+      </AlertDescription>
+    </Alert>
   );
 }
 
@@ -183,8 +217,12 @@ function ObsGuide({
 
   return (
     <div className="flex flex-col gap-4">
+      <ObsStreamAlert />
+
       <div className="flex flex-col gap-2">
+        <Label htmlFor="stream-name">Stream name</Label>
         <Input
+          id="stream-name"
           autoFocus
           placeholder="Choose a stream name"
           value={streamName}
