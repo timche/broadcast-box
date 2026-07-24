@@ -2,7 +2,9 @@ import { Eye, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { StatusMessage } from "@/components/player/status-message";
 import { toast } from "@/components/ui/toast";
+import { useControlsVisibility } from "@/hooks/use-controls-visibility";
 import type { StreamState, StreamStatus } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { setupWhepConnection } from "@/lib/webrtc/whep";
 
 interface PlayerProps {
@@ -27,6 +29,8 @@ export function Player({
   const videoRef = useRef<HTMLVideoElement>(null);
   const statusChangeRef = useRef(onStreamStatusChange);
   statusChangeRef.current = onStreamStatusChange;
+
+  const { visible: controlsVisible, containerProps } = useControlsVisibility();
 
   useEffect(() => {
     let currentConnection: RTCPeerConnection | null = null;
@@ -91,8 +95,13 @@ export function Player({
     };
   }, [streamKey]);
 
+  const fadeClass = cn(
+    "transition-opacity duration-300",
+    controlsVisible ? "opacity-100" : "opacity-0",
+  );
+
   return (
-    <div className="relative size-full bg-black">
+    <div className="relative size-full bg-black" {...containerProps}>
       <video
         ref={videoRef}
         autoPlay
@@ -106,14 +115,24 @@ export function Player({
       />
 
       {streamState === "Playing" && (
-        <span className="pointer-events-none absolute top-2 left-2 z-20 rounded bg-red-600 px-1.5 py-0.5 text-xs font-semibold tracking-wide text-white uppercase">
+        <span
+          className={cn(
+            "pointer-events-none absolute top-2 left-2 z-20 rounded bg-red-600 px-1.5 py-0.5 text-xs font-semibold tracking-wide text-white uppercase",
+            fadeClass,
+          )}
+        >
           Live
         </span>
       )}
 
       <div className="absolute top-2 right-2 z-20 flex items-center gap-2">
         {isOnline && (
-          <span className="pointer-events-none flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-xs font-medium text-white">
+          <span
+            className={cn(
+              "pointer-events-none flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-xs font-medium text-white",
+              fadeClass,
+            )}
+          >
             <Eye className="size-3.5" />
             {viewers}
           </span>
