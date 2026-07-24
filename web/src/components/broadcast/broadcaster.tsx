@@ -3,7 +3,12 @@ import { Check, Copy, Eye, EyeOff, MonitorUp, Webcam } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { HeaderPortal } from "@/components/layout/header-portal";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import { toast } from "@/lib/toast";
 import type { StreamStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -249,24 +254,21 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
       style={{ height: `calc(100dvh - ${HEADER_HEIGHT})` }}
     >
       <HeaderPortal>
-        <div className="flex items-center gap-1">
-          <Input
+        <InputGroup className="h-7 w-auto max-w-[60vw]">
+          <InputGroupInput
             readOnly
             value={shareUrl}
+            size={shareUrl.length}
             onFocus={(event) => event.currentTarget.select()}
-            className="h-7 w-56 max-w-[45vw] text-xs"
             aria-label="Stream URL"
+            className="w-auto flex-none text-xs"
           />
-          <Button
-            size="icon"
-            variant="ghost"
-            className="size-7"
-            onClick={copyShareUrl}
-            aria-label="Copy stream URL"
-          >
-            {copied ? <Check className="size-4 text-emerald-500" /> : <Copy className="size-4" />}
-          </Button>
-        </div>
+          <InputGroupAddon align="inline-end">
+            <InputGroupButton size="icon-xs" onClick={copyShareUrl} aria-label="Copy stream URL">
+              {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+            </InputGroupButton>
+          </InputGroupAddon>
+        </InputGroup>
       </HeaderPortal>
 
       <div className="relative min-h-0 flex-1">
