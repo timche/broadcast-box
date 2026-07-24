@@ -94,8 +94,8 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
         </div>
       </HeaderPortal>
 
-      <div className="flex size-full">
-        <div className="relative min-w-0 flex-1">
+      <div className="flex size-full flex-col md:flex-row">
+        <div className="relative min-h-0 min-w-0 flex-1">
           {isSingle ? (
             <Player
               streamKey={streamKeys[0]}
@@ -145,7 +145,7 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
         </div>
 
         {chatOpen && (
-          <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-l md:w-80">
+          <aside className="flex min-h-0 flex-1 flex-col overflow-y-auto border-t md:w-80 md:flex-none md:border-t-0 md:border-l">
             {streamKeys.map((streamKey) => {
               const collapsed = collapsedChats[streamKey] ?? false;
               return (

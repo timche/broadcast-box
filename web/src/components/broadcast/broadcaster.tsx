@@ -274,8 +274,8 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
         </InputGroup>
       </HeaderPortal>
 
-      <div className="flex min-h-0 flex-1">
-        <div className="flex min-w-0 flex-1 flex-col bg-black">
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-black">
           <div className="relative min-h-0 flex-1">
             <video
               ref={videoRef}
@@ -307,11 +307,11 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
           <div className="bg-background flex w-full gap-2 p-2">
             <Button className="flex-1" onClick={() => requestMedia("Screen")}>
               <MonitorUp className="size-4" />
-              Share screen
+              <span className="hidden sm:inline">Share screen</span>
             </Button>
             <Button className="flex-1" variant="secondary" onClick={() => requestMedia("Webcam")}>
               <Webcam className="size-4" />
-              Share webcam
+              <span className="hidden sm:inline">Share webcam</span>
             </Button>
             <Button
               className="flex-1"
@@ -319,7 +319,9 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
               onClick={() => setPreviewHidden((hidden) => !hidden)}
             >
               {previewHidden ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
-              {previewHidden ? "Show preview" : "Hide preview"}
+              <span className="hidden sm:inline">
+                {previewHidden ? "Show preview" : "Hide preview"}
+              </span>
             </Button>
             <Button
               variant={chatOpen ? "default" : "secondary"}
@@ -334,14 +336,15 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
                 variant="destructive"
                 onClick={() => void navigate({ to: "/" })}
               >
-                End stream
+                <span className="hidden sm:inline">End stream</span>
+                <span className="sm:hidden">End</span>
               </Button>
             )}
           </div>
         </div>
 
         {chatOpen && (
-          <aside className="w-72 shrink-0 border-l md:w-80">
+          <aside className="min-h-0 flex-1 border-t md:w-80 md:flex-none md:border-t-0 md:border-l">
             <Chat channel={chatChannel} />
           </aside>
         )}
