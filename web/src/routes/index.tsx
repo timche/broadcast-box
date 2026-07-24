@@ -5,6 +5,7 @@ import { PreviouslyWatched } from "@/components/previously-watched";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { getLastStreamName, setLastStreamName } from "@/lib/last-stream";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -13,13 +14,14 @@ export const Route = createFileRoute("/")({
 function Home() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<"watch" | "share">("watch");
-  const [streamName, setStreamName] = useState("");
+  const [streamName, setStreamName] = useState(getLastStreamName);
 
   const submit = () => {
     const name = streamName.trim();
     if (name === "") {
       return;
     }
+    setLastStreamName(name);
     if (mode === "share") {
       void navigate({ to: "/publish/$streamKey", params: { streamKey: name } });
     } else {
