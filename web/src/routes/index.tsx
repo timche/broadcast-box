@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { BookOpen, Check, Copy, Info, Users, Video } from "lucide-react";
+import { Check, Copy, Info, Radio, Users, Video } from "lucide-react";
 import { useState } from "react";
 import { PreviouslyWatched } from "@/components/previously-watched";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -91,7 +91,7 @@ function Home() {
               onClick={() => selectTab("obs")}
               className="h-auto py-2 text-center text-xs leading-tight whitespace-normal sm:text-sm"
             >
-              <BookOpen className="size-4" />
+              <Radio className="size-4" />
               Stream with OBS
             </Button>
           </div>
