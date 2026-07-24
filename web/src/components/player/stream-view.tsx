@@ -103,7 +103,7 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
             aria-label={chatOpen ? "Hide chat" : "Show chat"}
           >
             <MessageSquare className="size-4" />
-            Chat
+            <span className="hidden sm:inline">{chatOpen ? "Hide chat" : "Show chat"}</span>
           </Button>
         </div>
       </HeaderPortal>
