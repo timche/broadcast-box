@@ -12,6 +12,8 @@ interface PlayerProps {
   showClose?: boolean;
   onClose?: () => void;
   onStreamStatusChange?: (streamKey: string, status: StreamStatus) => void;
+  /** Receives the chat data channel (or `null` on teardown) when chat is enabled. */
+  onChatChannel?: (channel: RTCDataChannel | null) => void;
 }
 
 export function Player({
@@ -19,6 +21,7 @@ export function Player({
   showClose = false,
   onClose,
   onStreamStatusChange,
+  onChatChannel,
 }: PlayerProps) {
   const streamKey = decodeURIComponent(rawStreamKey).replace(/ /g, "_");
 
@@ -29,6 +32,9 @@ export function Player({
   const videoRef = useRef<HTMLVideoElement>(null);
   const statusChangeRef = useRef(onStreamStatusChange);
   statusChangeRef.current = onStreamStatusChange;
+  const chatChannelRef = useRef(onChatChannel);
+  chatChannelRef.current = onChatChannel;
+  const chatEnabled = onChatChannel != null;
 
   const { visible: controlsVisible, containerProps } = useControlsVisibility();
 
@@ -44,6 +50,9 @@ export function Player({
     const connect = () => {
       setupWhepConnection(streamKey, {
         videoRef,
+        onChatChannel: chatEnabled
+          ? (channel) => chatChannelRef.current?.(channel)
+          : undefined,
         onOffline: () => {
           setIsOnline(false);
           setStreamState("Offline");
@@ -92,8 +101,9 @@ export function Player({
       cancelled = true;
       window.removeEventListener("beforeunload", beforeUnload);
       currentConnection?.close();
+      chatChannelRef.current?.(null);
     };
-  }, [streamKey]);
+  }, [streamKey, chatEnabled]);
 
   const fadeClass = cn(
     "transition-opacity duration-300",

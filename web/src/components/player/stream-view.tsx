@@ -1,6 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Plus, X } from "lucide-react";
+import { MessageSquare, Plus, X } from "lucide-react";
 import { Fragment, useEffect, useState } from "react";
+import { Chat } from "@/components/chat/chat";
 import { HeaderPortal } from "@/components/layout/header-portal";
 import { Player } from "@/components/player/player";
 import { PreviouslyWatched } from "@/components/previously-watched";
@@ -36,6 +37,8 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   const navigate = useNavigate();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newStreamName, setNewStreamName] = useState("");
+  const [chatOpen, setChatOpen] = useState(true);
+  const [chatChannel, setChatChannel] = useState<RTCDataChannel | null>(null);
 
   // Remember every stream watched (used for "Previously watched").
   useEffect(() => {
@@ -71,14 +74,36 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   return (
     <div className="w-full bg-black" style={{ height: `calc(100dvh - ${HEADER_HEIGHT})` }}>
       <HeaderPortal>
-        <Button size="sm" variant="secondary" onClick={() => setIsAddOpen(true)}>
-          <Plus className="size-4" />
-          Add stream
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="secondary" onClick={() => setIsAddOpen(true)}>
+            <Plus className="size-4" />
+            Add stream
+          </Button>
+          {isSingle && (
+            <Button
+              size="sm"
+              variant={chatOpen ? "default" : "secondary"}
+              onClick={() => setChatOpen((open) => !open)}
+              aria-label={chatOpen ? "Hide chat" : "Show chat"}
+            >
+              <MessageSquare className="size-4" />
+              Chat
+            </Button>
+          )}
+        </div>
       </HeaderPortal>
 
       {isSingle ? (
-        <Player streamKey={streamKeys[0]} />
+        <div className="flex size-full">
+          <div className="relative min-w-0 flex-1">
+            <Player streamKey={streamKeys[0]} onChatChannel={setChatChannel} />
+          </div>
+          {chatOpen && (
+            <aside className="w-72 shrink-0 border-l md:w-80">
+              <Chat channel={chatChannel} />
+            </aside>
+          )}
+        </div>
       ) : (
         // Re-tiling on a stream set change is done by remounting the group
         // (keyed on the stream list) so panel sizes reset to an even split.
