@@ -1,9 +1,9 @@
 FROM oven/bun:latest AS web-build
 WORKDIR /broadcast-box/web
 COPY . /broadcast-box
-# Site name is baked into the frontend at build time. Override with
-# `docker build --build-arg VITE_SITE_NAME="Your Name"`.
-ARG VITE_SITE_NAME="monkaS TV"
+# Site name is baked into the frontend at build time; defaults to
+# "Broadcast Box" when unset. Set via `docker build --build-arg VITE_SITE_NAME="Your Name"`.
+ARG VITE_SITE_NAME=""
 ENV VITE_SITE_NAME=${VITE_SITE_NAME}
 RUN bun install --frozen-lockfile && bun run build
 
