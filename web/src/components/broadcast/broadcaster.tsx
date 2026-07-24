@@ -10,6 +10,7 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { toast } from "@/components/ui/toast";
+import { useControlsVisibility } from "@/hooks/use-controls-visibility";
 import type { StreamStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { addPublishTransceivers, negotiateWhip } from "@/lib/webrtc/whip";
@@ -74,6 +75,8 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
   const eventSourceRef = useRef<EventSource | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const badSignalCountRef = useRef(10);
+
+  const { visible: controlsVisible, containerProps } = useControlsVisibility();
 
   const shareUrl = `${window.location.origin}/${streamKey}`;
 
@@ -270,7 +273,7 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
         </InputGroup>
       </HeaderPortal>
 
-      <div className="relative min-h-0 flex-1">
+      <div className="relative min-h-0 flex-1" {...containerProps}>
         <video
           ref={videoRef}
           autoPlay
@@ -286,12 +289,22 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
         )}
 
         {publishSuccess && (
-          <span className="pointer-events-none absolute top-2 left-2 z-20 rounded bg-red-600 px-1.5 py-0.5 text-xs font-semibold tracking-wide text-white uppercase">
+          <span
+            className={cn(
+              "pointer-events-none absolute top-2 left-2 z-20 rounded bg-red-600 px-1.5 py-0.5 text-xs font-semibold tracking-wide text-white uppercase transition-opacity duration-300",
+              controlsVisible ? "opacity-100" : "opacity-0",
+            )}
+          >
             Live
           </span>
         )}
         {isOnline && (
-          <span className="pointer-events-none absolute top-2 right-2 z-20 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-xs font-medium text-white">
+          <span
+            className={cn(
+              "pointer-events-none absolute top-2 right-2 z-20 flex items-center gap-1 rounded bg-black/60 px-1.5 py-0.5 text-xs font-medium text-white transition-opacity duration-300",
+              controlsVisible ? "opacity-100" : "opacity-0",
+            )}
+          >
             <Eye className="size-3.5" />
             {viewers}
           </span>
