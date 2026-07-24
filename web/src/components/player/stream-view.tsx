@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { cn } from "@/lib/utils";
 import { addWatchedStream } from "@/lib/watched";
+import type { ChatConnection } from "@/lib/webrtc/chat";
 
 const HEADER_HEIGHT = "2.75rem";
 
@@ -35,11 +36,11 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newStreamName, setNewStreamName] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
-  const [chatChannels, setChatChannels] = useState<Record<string, RTCDataChannel | null>>({});
+  const [chatChannels, setChatChannels] = useState<Record<string, ChatConnection | null>>({});
 
   const [collapsedChats, setCollapsedChats] = useState<Record<string, boolean>>({});
 
-  const setChatChannelFor = useCallback((streamKey: string, channel: RTCDataChannel | null) => {
+  const setChatChannelFor = useCallback((streamKey: string, channel: ChatConnection | null) => {
     setChatChannels((current) => ({ ...current, [streamKey]: channel }));
   }, []);
 

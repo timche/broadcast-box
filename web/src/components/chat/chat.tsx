@@ -14,6 +14,7 @@ import { useChat } from "@/hooks/use-chat";
 import { getDisplayName, setDisplayName } from "@/lib/display-name";
 import { cn } from "@/lib/utils";
 import {
+  type ChatConnection,
   type ChatMessage,
   type ChatStatus,
   MAX_DISPLAY_NAME_LENGTH,
@@ -52,7 +53,7 @@ function ChatLine({ message }: { message: ChatMessage }) {
 }
 
 interface ChatProps {
-  channel: RTCDataChannel | null;
+  channel: ChatConnection | null;
   title?: string;
   className?: string;
   /** When set, the header becomes a toggle that collapses the chat body. */

@@ -5,6 +5,7 @@ import { toast } from "@/components/ui/toast";
 import { useControlsVisibility } from "@/hooks/use-controls-visibility";
 import type { StreamState, StreamStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import type { ChatConnection } from "@/lib/webrtc/chat";
 import { setupWhepConnection } from "@/lib/webrtc/whep";
 
 interface PlayerProps {
@@ -12,8 +13,8 @@ interface PlayerProps {
   showClose?: boolean;
   onClose?: () => void;
   onStreamStatusChange?: (streamKey: string, status: StreamStatus) => void;
-  /** Receives the chat data channel (or `null` on teardown) when chat is enabled. */
-  onChatChannel?: (channel: RTCDataChannel | null) => void;
+  /** Receives the chat connection (or `null` on teardown) when chat is enabled. */
+  onChatChannel?: (connection: ChatConnection | null) => void;
 }
 
 export function Player({
@@ -50,9 +51,7 @@ export function Player({
     const connect = () => {
       setupWhepConnection(streamKey, {
         videoRef,
-        onChatChannel: chatEnabled
-          ? (channel) => chatChannelRef.current?.(channel)
-          : undefined,
+        onChatChannel: chatEnabled ? (channel) => chatChannelRef.current?.(channel) : undefined,
         onOffline: () => {
           setIsOnline(false);
           setStreamState("Offline");

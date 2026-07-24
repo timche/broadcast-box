@@ -2,7 +2,7 @@ import { parseLinkHeader } from "@web3-storage/parse-link-header";
 import type { RefObject } from "react";
 import { api, bearer } from "@/lib/api";
 import type { StreamStatus } from "@/lib/types";
-import { createChatDataChannel } from "@/lib/webrtc/chat";
+import { type ChatConnection, createChatConnection } from "@/lib/webrtc/chat";
 
 const SSE_REL = "urn:ietf:params:whep:ext:core:server-sent-events";
 
@@ -13,8 +13,8 @@ export interface WhepHandlers {
   onStreamStatus(status: StreamStatus): void;
   onStreamRestart(): void;
   onOffline(): void;
-  /** When provided, a `bb-chat-v1` data channel is opened and handed back. */
-  onChatChannel?(channel: RTCDataChannel): void;
+  /** When provided, a `bb-chat-v1` chat connection is opened and handed back. */
+  onChatChannel?(connection: ChatConnection): void;
 }
 
 function stopVideoTrack(video: HTMLVideoElement): void {
@@ -50,7 +50,7 @@ export async function setupWhepConnection(
 
   // Open the chat data channel before negotiation so the backend binds it.
   if (handlers.onChatChannel) {
-    handlers.onChatChannel(createChatDataChannel(peerConnection));
+    handlers.onChatChannel(createChatConnection(peerConnection));
   }
 
   const remoteStream = new MediaStream();

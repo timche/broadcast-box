@@ -13,7 +13,7 @@ import {
 import { toast } from "@/components/ui/toast";
 import type { StreamStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { createChatDataChannel } from "@/lib/webrtc/chat";
+import { type ChatConnection, createChatConnection } from "@/lib/webrtc/chat";
 import { addPublishTransceivers, negotiateWhip } from "@/lib/webrtc/whip";
 
 const HEADER_HEIGHT = "2.75rem";
@@ -70,7 +70,7 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
   const [isOnline, setIsOnline] = useState(false);
   const [viewers, setViewers] = useState(0);
   const [copied, setCopied] = useState(false);
-  const [chatChannel, setChatChannel] = useState<RTCDataChannel | null>(null);
+  const [chatChannel, setChatChannel] = useState<ChatConnection | null>(null);
   const [chatOpen, setChatOpen] = useState(true);
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
@@ -180,7 +180,7 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
         localStreamRef.current = stream;
 
         // Open the chat data channel before negotiation so the backend binds it.
-        setChatChannel(createChatDataChannel(peerConnection));
+        setChatChannel(createChatConnection(peerConnection));
 
         addPublishTransceivers(peerConnection, audioTrack, videoTrack);
 
