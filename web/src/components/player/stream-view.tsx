@@ -37,7 +37,7 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   const navigate = useNavigate();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newStreamName, setNewStreamName] = useState("");
-  const [chatOpen, setChatOpen] = useState(true);
+  const [chatOpen, setChatOpen] = useState(false);
   const [chatChannel, setChatChannel] = useState<RTCDataChannel | null>(null);
 
   // Remember every stream watched (used for "Previously watched").
