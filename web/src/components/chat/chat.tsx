@@ -13,7 +13,12 @@ import {
 import { useChat } from "@/hooks/use-chat";
 import { getDisplayName, setDisplayName } from "@/lib/display-name";
 import { cn } from "@/lib/utils";
-import { type ChatMessage, type ChatStatus, MAX_MESSAGE_LENGTH } from "@/lib/webrtc/chat";
+import {
+  type ChatMessage,
+  type ChatStatus,
+  MAX_DISPLAY_NAME_LENGTH,
+  MAX_MESSAGE_LENGTH,
+} from "@/lib/webrtc/chat";
 
 /** Deterministic, readable name colour derived from the display name. */
 function nameColor(displayName: string): string {
@@ -54,28 +59,37 @@ interface ChatProps {
 export function Chat({ channel, className }: ChatProps) {
   const { messages, status, sendMessage } = useChat(channel);
 
-  const [name, setName] = useState(getDisplayName);
+  const [nickname, setNickname] = useState(getDisplayName);
+  const [nameDraft, setNameDraft] = useState("");
   const [editingName, setEditingName] = useState(false);
   const [draft, setDraft] = useState("");
 
-  const trimmedName = name.trim();
-  const canSend = status === "connected" && draft.trim().length > 0 && trimmedName.length > 0;
+  const trimmedNickname = nickname.trim();
+  const hasNickname = trimmedNickname.length > 0;
+  // Until a nickname is set, the message input is replaced by the nickname form.
+  const showNameForm = editingName || !hasNickname;
+  const canSend = status === "connected" && draft.trim().length > 0 && hasNickname;
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (trimmedName.length === 0) {
-      setEditingName(true);
-      return;
-    }
-    if (sendMessage(draft, trimmedName)) {
+    if (sendMessage(draft, trimmedNickname)) {
       setDraft("");
     }
   };
 
+  const startEditingName = () => {
+    setNameDraft(nickname);
+    setEditingName(true);
+  };
+
   const commitName = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setDisplayName(name);
-    setName(name.trim());
+    const trimmed = nameDraft.trim();
+    if (trimmed.length === 0) {
+      return;
+    }
+    setDisplayName(trimmed);
+    setNickname(trimmed);
     setEditingName(false);
   };
 
@@ -120,49 +134,56 @@ export function Chat({ channel, className }: ChatProps) {
       </MessageScrollerProvider>
 
       <div className="shrink-0 border-t p-3">
-        <form onSubmit={submit} className="flex items-center gap-2">
-          <Input
-            value={draft}
-            maxLength={MAX_MESSAGE_LENGTH}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="Send a message"
-            aria-label="Chat message"
-          />
-          <Button type="submit" size="icon" disabled={!canSend} aria-label="Send message">
-            <SendHorizontal className="size-4" />
-          </Button>
-        </form>
-
-        {editingName ? (
-          <form onSubmit={commitName} className="mt-2 flex items-center gap-2">
-            <Input
-              autoFocus
-              value={name}
-              maxLength={80}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Display name"
-              aria-label="Display name"
-              className="h-7 text-xs"
-            />
-            <Button type="submit" size="xs" variant="secondary">
-              Save
-            </Button>
+        {showNameForm ? (
+          <form onSubmit={commitName} className="flex flex-col gap-2">
+            {!hasNickname && (
+              <p className="text-muted-foreground text-xs">Set a nickname to join the chat.</p>
+            )}
+            <div className="flex items-center gap-2">
+              <Input
+                autoFocus
+                value={nameDraft}
+                maxLength={MAX_DISPLAY_NAME_LENGTH}
+                onChange={(event) => setNameDraft(event.target.value)}
+                placeholder="Nickname"
+                aria-label="Nickname"
+              />
+              <Button type="submit" disabled={nameDraft.trim().length === 0}>
+                {hasNickname ? "Save" : "Join"}
+              </Button>
+              {hasNickname && (
+                <Button type="button" variant="ghost" onClick={() => setEditingName(false)}>
+                  Cancel
+                </Button>
+              )}
+            </div>
           </form>
         ) : (
-          <button
-            type="button"
-            onClick={() => setEditingName(true)}
-            className="text-muted-foreground hover:text-foreground mt-2 flex items-center gap-1 text-xs"
-          >
-            <Pencil className="size-3" />
-            {trimmedName.length > 0 ? (
+          <>
+            <form onSubmit={submit} className="flex items-center gap-2">
+              <Input
+                value={draft}
+                maxLength={MAX_MESSAGE_LENGTH}
+                onChange={(event) => setDraft(event.target.value)}
+                placeholder="Send a message"
+                aria-label="Chat message"
+              />
+              <Button type="submit" size="icon" disabled={!canSend} aria-label="Send message">
+                <SendHorizontal className="size-4" />
+              </Button>
+            </form>
+
+            <button
+              type="button"
+              onClick={startEditingName}
+              className="text-muted-foreground hover:text-foreground mt-2 flex items-center gap-1 text-xs"
+            >
+              <Pencil className="size-3" />
               <span>
-                Chatting as <span className="text-foreground font-medium">{trimmedName}</span>
+                Chatting as <span className="text-foreground font-medium">{trimmedNickname}</span>
               </span>
-            ) : (
-              <span>Set a display name to chat</span>
-            )}
-          </button>
+            </button>
+          </>
         )}
       </div>
     </div>
