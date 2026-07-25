@@ -8,6 +8,7 @@ import (
 	"github.com/glimesh/broadcast-box/internal/chat"
 	"github.com/glimesh/broadcast-box/internal/webrtc/sessions/whep"
 	"github.com/glimesh/broadcast-box/internal/webrtc/sessions/whip"
+	"github.com/glimesh/broadcast-box/internal/webrtc/utils"
 )
 
 type Session struct {
@@ -31,4 +32,8 @@ type Session struct {
 	WHEPSessions     map[string]*whep.WHEPSession
 
 	ChatManager *chat.Manager
+
+	// Caches the rendered status SSE event, which is identical for every viewer
+	// of this session. See GetSessionStatsEvent.
+	statsEventCache utils.CachedString
 }

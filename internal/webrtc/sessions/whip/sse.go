@@ -5,8 +5,23 @@ import (
 	"log/slog"
 )
 
-// Returns all available Video and Audio layers of the provided stream key
+// Returns all available Video and Audio layers of the provided stream key.
+//
+// The payload is identical for every viewer of the stream and only changes when
+// tracks are added or removed, so it is rendered once and reused until
+// invalidateAvailableLayersEvent is called.
 func (w *WHIPSession) GetAvailableLayersEvent() string {
+	return w.availableLayersEventCache.Get(0, w.renderAvailableLayersEvent)
+}
+
+// Drops the cached layers event, forcing the next reader to render it again.
+// Must be called after releasing TracksLock: the cache serializes regeneration
+// against invalidation, and rendering acquires TracksLock.
+func (w *WHIPSession) invalidateAvailableLayersEvent() {
+	w.availableLayersEventCache.Invalidate()
+}
+
+func (w *WHIPSession) renderAvailableLayersEvent() string {
 	videoLayers := []simulcastLayerResponse{}
 	audioLayers := []simulcastLayerResponse{}
 
