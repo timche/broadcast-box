@@ -102,8 +102,10 @@ func newFrontendHandler(frontendFilePath string) http.HandlerFunc {
 		file, err := fileSystem.Open(path.Clean(request.URL.Path))
 		if err == nil {
 			// The probe only cares whether the file exists. Closing it
-			// immediately avoids leaking a descriptor per request.
-			file.Close()
+			// immediately avoids leaking a descriptor per request. Nothing was
+			// read from the handle, so a close error carries no information
+			// worth acting on or logging per request.
+			_ = file.Close()
 		}
 
 		if errors.Is(err, os.ErrNotExist) {
