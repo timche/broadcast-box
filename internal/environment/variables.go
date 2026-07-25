@@ -27,6 +27,7 @@ const (
 
 	// CHAT
 	ChatMaxHistory      = "CHAT_MAX_HISTORY"
+	ChatMaxReplay       = "CHAT_MAX_REPLAY"
 	ChatDefaultTTL      = "CHAT_DEFAULT_TTL"
 	ChatCleanupInterval = "CHAT_CLEANUP_INTERVAL"
 
