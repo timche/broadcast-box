@@ -112,7 +112,7 @@ func (w *WHEPSession) SetAudioLayer(encodingID string) {
 	slog.Debug("Setting Audio Layer")
 	w.AudioLayerCurrent.Store(encodingID)
 	w.IsWaitingForKeyframe.Store(true)
-	w.SendPLI()
+	w.sendPLINow()
 }
 
 // Sets the requested video layer for this WHEP session.
@@ -126,14 +126,53 @@ func (w *WHEPSession) SetVideoLayer(encodingID string) {
 	w.VideoLock.Unlock()
 
 	w.IsWaitingForKeyframe.Store(true)
-	w.SendPLI()
+	w.sendPLINow()
 }
 
+// Minimum time between two PLIs forwarded to the publisher for a single WHEP
+// session. While a viewer waits for a keyframe every non-keyframe packet asks
+// for a PLI, so on a 3000 packet/sec stream an ungated path would send ~3000
+// RTCP messages per second per viewer back at the broadcaster. The tradeoff:
+// too frequent is a feedback storm (amplified by every viewer being reset at
+// once when a publisher reconnects), too slow means a joining viewer waits
+// longer for its first frame if a keyframe request is lost.
+const minPLIInterval = 500 * time.Millisecond
+
+// Requests a keyframe from the publisher, rate limited to at most one PLI per
+// minPLIInterval for this session. The first PLI of a session is always sent
+// immediately.
 func (w *WHEPSession) SendPLI() {
 	if w.IsSessionClosed.Load() {
 		return
 	}
 
+	now := time.Now().UnixNano()
+	last := w.lastPLISent.Load()
+
+	// A zero lastPLISent means no PLI has ever been sent for this session, so
+	// send right away rather than waiting out an interval.
+	if last != 0 && now-last < int64(minPLIInterval) {
+		return
+	}
+
+	// CompareAndSwap makes sure that of any number of concurrent callers
+	// observing the same `last`, exactly one gets through the gate.
+	if !w.lastPLISent.CompareAndSwap(last, now) {
+		return
+	}
+
+	w.pliSender()
+}
+
+// Requests a keyframe from the publisher immediately, bypassing the rate
+// limiter. Used for deliberate, low frequency actions (such as a viewer
+// switching layers) where the new video must start as soon as possible.
+func (w *WHEPSession) sendPLINow() {
+	if w.IsSessionClosed.Load() {
+		return
+	}
+
+	w.lastPLISent.Store(time.Now().UnixNano())
 	w.pliSender()
 }
 
