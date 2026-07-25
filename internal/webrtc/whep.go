@@ -67,7 +67,7 @@ func WHEP(offer string, streamKey string) (string, string, error) {
 		videoTrack,
 		videoRTCPSender,
 		func() {
-			manager.SessionsManager.SendPLIByWHEPSessionID(whepSessionID)
+			session.SendPLIToHost(whepSessionID)
 		},
 	); err != nil {
 		return "", "", err

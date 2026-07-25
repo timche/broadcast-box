@@ -25,6 +25,32 @@ func (session *Session) SetOnClose(onClose func()) {
 	session.onClose = onClose
 }
 
+// SetWHEPSessionHooks registers callbacks that are invoked whenever a WHEP
+// session is added to, or removed from, this session. They are called while
+// WHEPSessionsLock is held so that any index they maintain stays consistent
+// with WHEPSessions, which means they must not call back into this session.
+//
+// Must be called before the session is published to other goroutines.
+func (s *Session) SetWHEPSessionHooks(onAdded func(whepSessionID string, whepSession *whep.WHEPSession), onRemoved func(whepSessionID string)) {
+	s.onWHEPSessionAdded = onAdded
+	s.onWHEPSessionRemoved = onRemoved
+}
+
+// Sends a PLI (keyframe request) to the host of this session, if there is one.
+func (s *Session) SendPLIToHost(whepSessionID string) {
+	host := s.Host.Load()
+	if host == nil {
+		slog.Error(
+			"Session.SendPLIToHost: WHIP session not found",
+			"whepSessionID", whepSessionID,
+			"streamKey", s.StreamKey,
+		)
+		return
+	}
+
+	host.SendPLI()
+}
+
 // Add WHEP viewer session
 func (s *Session) AddWHEP(whepSessionID string, peerConnection *webrtc.PeerConnection, audioTrack *codecs.TrackMultiCodec, videoTrack *codecs.TrackMultiCodec, videoRTCPSender *webrtc.RTPSender, pliSender func()) (err error) {
 	slog.Debug("WHIPSessionManager.WHIPSession.AddWHEPSession")
@@ -42,7 +68,21 @@ func (s *Session) AddWHEP(whepSessionID string, peerConnection *webrtc.PeerConne
 	whepSession.SetOnClose(s.handleWHEPClose)
 
 	s.WHEPSessionsLock.Lock()
+	if s.isClosed {
+		s.WHEPSessionsLock.Unlock()
+
+		slog.Warn("Session.AddWHEP: session is closed", "streamKey", s.StreamKey, "whepSessionID", whepSessionID)
+		if closeErr := peerConnection.Close(); closeErr != nil {
+			slog.Error("Session.AddWHEP.PeerConnection.Close.Error", "err", closeErr)
+		}
+
+		return fmt.Errorf("session %q is closed", s.StreamKey)
+	}
+
 	s.WHEPSessions[whepSessionID] = whepSession
+	if s.onWHEPSessionAdded != nil {
+		s.onWHEPSessionAdded(whepSessionID, whepSession)
+	}
 	s.WHEPSessionsLock.Unlock()
 	s.updateHostWHEPSessionsSnapshot()
 	whepSession.RegisterWHEPHandlers(peerConnection)
@@ -115,6 +155,9 @@ func (s *Session) handleWHEPClose(whepSessionID string) {
 	_, ok := s.WHEPSessions[whepSessionID]
 	if ok {
 		delete(s.WHEPSessions, whepSessionID)
+		if s.onWHEPSessionRemoved != nil {
+			s.onWHEPSessionRemoved(whepSessionID)
+		}
 	}
 	s.WHEPSessionsLock.Unlock()
 
@@ -141,9 +184,16 @@ func (s *Session) handleHostClosed() {
 func (s *Session) close() {
 	s.closeOnce.Do(func() {
 		s.WHEPSessionsLock.Lock()
+		// Mark the session closed while holding the lock so that a concurrent
+		// AddWHEP cannot re-populate WHEPSessions (or any index built from it)
+		// after this bulk removal.
+		s.isClosed = true
 		whepSessions := make([]*whep.WHEPSession, 0, len(s.WHEPSessions))
-		for _, whepSession := range s.WHEPSessions {
+		for whepSessionID, whepSession := range s.WHEPSessions {
 			whepSessions = append(whepSessions, whepSession)
+			if s.onWHEPSessionRemoved != nil {
+				s.onWHEPSessionRemoved(whepSessionID)
+			}
 		}
 		s.WHEPSessions = make(map[string]*whep.WHEPSession)
 		s.WHEPSessionsLock.Unlock()
