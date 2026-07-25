@@ -17,9 +17,13 @@ const (
 	StreamPolicyReservedOnly = "RESERVED"
 )
 
+// Stream keys become part of a profile's filename, so the pattern is anchored:
+// an unanchored match succeeds on any string merely *containing* a legal
+// character, which would let a key like "../evil" through.
+var streamKeyPattern = regexp.MustCompile(`^[\p{L}\p{N}_-]+$`)
+
 func isValidStreamKey(streamKey string) bool {
-	regExp := regexp.MustCompile(`[\p{L}\p{N}_-]+`)
-	return regExp.MatchString(streamKey)
+	return streamKeyPattern.MatchString(streamKey)
 }
 
 // Create a new profile for the provided streamkey
