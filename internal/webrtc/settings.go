@@ -24,6 +24,7 @@ func getSettingEngine(isWHIP bool, tcpMuxCache map[string]ice.TCPMux, udpMuxCach
 	setupNetworkTypes()
 	setupNAT(&settingEngine)
 	setupInterfaceFilter(&settingEngine, &udpMuxOpts)
+	setupUDPMuxBuffers(&udpMuxOpts)
 	setupUDPMux(&settingEngine, isWHIP, udpMuxCache, udpMuxOpts)
 	setupTCPMux(&settingEngine, tcpMuxCache)
 
@@ -90,6 +91,45 @@ func setupUDPMux(settingEngine *webrtc.SettingEngine, isWHIP bool, udpMuxCache m
 	if udpMuxPort := getUDPMuxPort(isWHIP); udpMuxPort != 0 {
 		setUDPMuxPort(isWHIP, udpMuxPort, udpMuxCache, udpMuxOpts, settingEngine)
 	}
+}
+
+// Applies socket buffer sizes to the shared UDP mux.
+//
+// The kernel's default receive buffer is commonly around 200KB. A publisher
+// sending a high bitrate stream, or a server fanning out to many viewers, can
+// fill that faster than the read loop drains it, and the kernel then silently
+// discards datagrams. Those losses look like corrupt video rather than an
+// error, so raising the buffer is often the difference between a stream that
+// glitches under load and one that does not.
+//
+// Left unset by default, since the useful value depends on bitrate, viewer
+// count and the host's net.core.rmem_max ceiling, which caps what the kernel
+// will actually grant.
+func setupUDPMuxBuffers(muxOpts *[]ice.UDPMuxFromPortOption) {
+	if size := getBufferSize(environment.UDPMuxReadBufferSize); size > 0 {
+		slog.Info("Setting UDP Mux read buffer size", "bytes", size)
+		*muxOpts = append(*muxOpts, ice.UDPMuxFromPortWithReadBufferSize(size))
+	}
+
+	if size := getBufferSize(environment.UDPMuxWriteBufferSize); size > 0 {
+		slog.Info("Setting UDP Mux write buffer size", "bytes", size)
+		*muxOpts = append(*muxOpts, ice.UDPMuxFromPortWithWriteBufferSize(size))
+	}
+}
+
+func getBufferSize(variable string) int {
+	value := os.Getenv(variable)
+	if value == "" {
+		return 0
+	}
+
+	size, err := strconv.Atoi(value)
+	if err != nil || size < 0 {
+		slog.Error("Ignoring invalid buffer size", "variable", variable, "value", value)
+		return 0
+	}
+
+	return size
 }
 
 func setupInterfaceFilter(settingEngine *webrtc.SettingEngine, muxOpts *[]ice.UDPMuxFromPortOption) {
