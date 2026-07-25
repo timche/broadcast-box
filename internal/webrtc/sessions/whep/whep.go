@@ -72,6 +72,23 @@ func (w *WHEPSession) Close() {
 	})
 }
 
+// Tears the session down without blocking the caller.
+//
+// The packet writers run on the publisher's read goroutine, which fans a
+// single RTP packet out to every viewer in turn. Anything they block on stalls
+// delivery to every other viewer and backs the publisher's receive buffer up
+// until it drops packets. Close() closes a PeerConnection and rebuilds the
+// host's session snapshot, which is far too slow to sit on that path.
+//
+// IsSessionClosed is set synchronously so that following packets short-circuit
+// at the top of SendVideoPacket/SendAudioPacket rather than spawning a
+// goroutine each. Close() sets it again inside its sync.Once, which is
+// harmless.
+func (w *WHEPSession) closeAsync() {
+	w.IsSessionClosed.Store(true)
+	go w.Close()
+}
+
 func (w *WHEPSession) SetOnClose(onClose func(string)) {
 	w.onClose = onClose
 }

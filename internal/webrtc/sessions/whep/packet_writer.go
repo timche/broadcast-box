@@ -29,7 +29,7 @@ func (w *WHEPSession) SendAudioPacket(packet codecs.TrackPacket) {
 	if err := audioTrack.WriteRTP(packet.Packet, packet.Codec); err != nil {
 		if errors.Is(err, io.ErrClosedPipe) {
 			slog.Info("WHEPSession.SendAudioPacket.ConnectionDropped")
-			w.Close()
+			w.closeAsync()
 		} else {
 			slog.Error("WHEPSession.SendAudioPacket.Error", "err", err)
 		}
@@ -74,7 +74,7 @@ func (w *WHEPSession) SendVideoPacket(packet codecs.TrackPacket) {
 
 		if errors.Is(err, io.ErrClosedPipe) {
 			slog.Info("WHEPSession.SendVideoPacket.ConnectionDropped")
-			w.Close()
+			w.closeAsync()
 		} else {
 			slog.Error("WHEPSession.SendVideoPacket.Error", "err", err)
 		}
