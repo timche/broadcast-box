@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"strings"
 
 	"github.com/glimesh/broadcast-box/internal/environment"
 	"github.com/google/uuid"
@@ -20,83 +19,62 @@ func assureProfilePath() {
 	}
 }
 
+// hasExistingStreamKey reports whether a profile file starts with
+// "<streamKey>_". The match is a case sensitive prefix test over the cached
+// file names, exactly as the previous directory scan did.
 func hasExistingStreamKey(streamKey string) bool {
-	profilePath := os.Getenv(environment.StreamProfilePath)
-	files, err := os.ReadDir(profilePath)
+	filePrefix := streamKey + profileFileSeparator
 
-	if err != nil {
-		slog.Error("Authorization: Error reading profile directory", "err", err)
-		return false
-	}
-
-	filePrefix := streamKey + "_"
-	for _, file := range files {
-		if !file.IsDir() && strings.HasPrefix(file.Name(), filePrefix) {
-			return true
-		}
-	}
-
-	return false
+	return profileFiles.has(func(idx *profileIndex) bool {
+		return idx.anyNameHasPrefix(filePrefix)
+	})
 }
 
+// hasExistingBearerToken reports whether a profile file name ends with
+// bearerToken. This is a case sensitive suffix test rather than an exact token
+// comparison, which is deliberately kept identical to the previous directory
+// scan; getProfileFileNameByBearerToken is the function that actually resolves
+// a token to a profile.
 func hasExistingBearerToken(bearerToken string) bool {
-	profilePath := os.Getenv(environment.StreamProfilePath)
-
-	files, err := os.ReadDir(profilePath)
-	if err != nil {
-		slog.Error("Authorization: Error reading profile directory", "err", err)
-		return false
-	}
-
-	for _, file := range files {
-		if !file.IsDir() && strings.HasSuffix(file.Name(), bearerToken) {
-			return true
-		}
-	}
-
-	return false
+	return profileFiles.has(func(idx *profileIndex) bool {
+		return idx.anyNameHasSuffix(bearerToken)
+	})
 }
 
+// getProfileFileNameByStreamKey returns the profile file whose name up to the
+// first "_" case insensitively equals streamKey, preferring the first such file
+// in os.ReadDir order.
 func getProfileFileNameByStreamKey(streamKey string) (string, error) {
-	profilePath := os.Getenv(environment.StreamProfilePath)
-
-	files, err := os.ReadDir(profilePath)
+	fileName, found, err := profileFiles.find(func(idx *profileIndex) (string, bool) {
+		return idx.fileNameByStreamKey(streamKey)
+	})
 	if err != nil {
-		slog.Error("Authorization: Error reading profile directory", "err", err)
 		return "", err
 	}
 
-	for _, file := range files {
-		fileToken := strings.Split(file.Name(), "_")
-
-		if !file.IsDir() && strings.EqualFold(streamKey, fileToken[0]) {
-			return file.Name(), nil
-		}
+	if !found {
+		return "", fmt.Errorf("could not find profile file")
 	}
 
-	return "", fmt.Errorf("could not find profile file")
+	return fileName, nil
 }
 
+// getProfileFileNameByBearerToken returns the profile file whose name after the
+// last "_" case insensitively equals bearerToken, preferring the first such
+// file in os.ReadDir order.
 func getProfileFileNameByBearerToken(bearerToken string) (string, error) {
-	profilePath := os.Getenv(environment.StreamProfilePath)
-
-	files, err := os.ReadDir(profilePath)
+	fileName, found, err := profileFiles.find(func(idx *profileIndex) (string, bool) {
+		return idx.fileNameByToken(bearerToken)
+	})
 	if err != nil {
-		slog.Error("Authorization: Error reading profile directory", "err", err)
 		return "", err
 	}
 
-	separator := "_"
-	for _, file := range files {
-		splitIndex := strings.LastIndex(file.Name(), separator)
-		fileToken := file.Name()[splitIndex+len(separator):]
-
-		if !file.IsDir() && strings.EqualFold(bearerToken, fileToken) {
-			return file.Name(), nil
-		}
+	if !found {
+		return "", fmt.Errorf("could not find profile file")
 	}
 
-	return "", fmt.Errorf("could not find profile file")
+	return fileName, nil
 }
 
 func generateToken() string {
