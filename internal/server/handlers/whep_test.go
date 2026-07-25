@@ -33,7 +33,12 @@ func TestWHEPHandlerCallsWebhook(t *testing.T) {
 	}))
 	defer server.Close()
 
+	// The handler reads the webhook URL from the snapshot taken at startup, so
+	// re-resolve after t.Setenv. Registered before t.Setenv so that cleanup runs
+	// in LIFO order: the environment is restored first, then re-snapshotted.
+	t.Cleanup(environment.ResolveEnvironmentVariables)
 	t.Setenv(environment.WebhookURL, server.URL)
+	environment.ResolveEnvironmentVariables()
 
 	req := httptest.NewRequest(http.MethodPost, "/api/whep?viewer=1", strings.NewReader("v=0"))
 	req.Header.Set("Authorization", "Bearer test_stream_key")

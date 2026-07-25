@@ -4,19 +4,17 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"os"
-	"strings"
 
 	"github.com/glimesh/broadcast-box/internal/environment"
 	"github.com/glimesh/broadcast-box/internal/server/helpers"
 )
 
 func logHandler(responseWriter http.ResponseWriter, request *http.Request) {
-	if !strings.EqualFold(os.Getenv(environment.LoggingAPIEnabled), "true") {
+	if !environment.IsLoggingAPIEnabled() {
 		return
 	}
 
-	if apiKey := os.Getenv(environment.LoggingAPIKey); apiKey != "" {
+	if apiKey := environment.GetLoggingAPIKey(); apiKey != "" {
 		authHeader := request.Header.Get("Authorization")
 		token := helpers.ResolveBearerToken(authHeader)
 

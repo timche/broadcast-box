@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"path"
-	"strings"
 
 	"github.com/glimesh/broadcast-box/internal/environment"
 	adminHandlers "github.com/glimesh/broadcast-box/internal/server/handlers/admin"
@@ -16,7 +15,7 @@ import (
 func GetServeMuxHandler() http.HandlerFunc {
 	serverMux := http.NewServeMux()
 
-	if os.Getenv(environment.FrontendDisabled) == "" {
+	if !environment.IsFrontendDisabled() {
 		serverMux.HandleFunc("/", frontendHandler)
 	}
 
@@ -47,9 +46,9 @@ func GetServeMuxHandler() http.HandlerFunc {
 	serverMux.HandleFunc("/api/admin/profiles/remove-profile", corsHandler(adminHandlers.ProfileRemoveHandler))
 
 	// Path middleware
-	debugOutputWebRequests := os.Getenv(environment.DebugIncomingAPIRequest)
+	debugOutputWebRequests := environment.ShouldDebugIncomingAPIRequest()
 	handler := http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
-		if strings.EqualFold(debugOutputWebRequests, "TRUE") {
+		if debugOutputWebRequests {
 			slog.Info("Calling path", "path", request.URL.Path)
 			_, pattern := serverMux.Handler(request)
 

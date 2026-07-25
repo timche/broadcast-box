@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/glimesh/broadcast-box/internal/environment"
@@ -29,7 +28,7 @@ func verifyAdminSession(request *http.Request) *sessionResponse {
 		}
 	}
 
-	adminAPIToken := os.Getenv(environment.FrontendAdminToken)
+	adminAPIToken := environment.GetFrontendAdminToken()
 
 	if adminAPIToken == "" || !strings.EqualFold(adminAPIToken, token) {
 		return &sessionResponse{

@@ -28,7 +28,7 @@ func sseHandler(responseWriter http.ResponseWriter, request *http.Request) {
 	values := strings.Split(request.URL.RequestURI(), "/")
 	sessionID := values[len(values)-1]
 
-	debugSseMessages := strings.EqualFold(os.Getenv(environment.DebugPrintSSEMessages), "true")
+	debugSseMessages := environment.ShouldDebugPrintSSEMessages()
 	writeTimeout := 500 * time.Millisecond
 
 	ctx := request.Context()

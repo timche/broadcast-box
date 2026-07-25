@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/glimesh/broadcast-box/internal/environment"
@@ -65,7 +64,7 @@ func WHIPHandler(responseWriter http.ResponseWriter, request *http.Request) {
 	var userProfile authorization.PublicProfile
 
 	// Stream profile policy
-	switch os.Getenv(environment.StreamProfilePolicy) {
+	switch environment.GetStreamProfilePolicy() {
 	// Only approved profiles are allowed to stream
 	case authorization.StreamPolicyReservedOnly:
 		slog.Info("Stream Policy Selected", "policy", authorization.StreamPolicyReservedOnly)
@@ -104,7 +103,7 @@ func WHIPHandler(responseWriter http.ResponseWriter, request *http.Request) {
 	}
 
 	// Stream requires webhook validation
-	if webhookURL := os.Getenv(environment.WebhookURL); webhookURL != "" {
+	if webhookURL := environment.GetWebhookURL(); webhookURL != "" {
 		streamKey, err := webhook.CallWebhook(webhookURL, webhook.WHIPConnect, userProfile.StreamKey, request)
 		if err != nil {
 			responseWriter.WriteHeader(http.StatusUnauthorized)
