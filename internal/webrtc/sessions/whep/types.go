@@ -40,12 +40,12 @@ type (
 		videoLayerPriority      int
 		videoLayerExplicit      bool
 
-		// Protects AudioTrack, AudioTimestamp, AudioPacketsWritten, AudioSequenceNumber
-		AudioLock           sync.RWMutex
-		AudioTrack          *codecs.TrackMultiCodec
-		AudioTimestamp      uint32
-		AudioPacketsWritten uint64
-		AudioSequenceNumber uint16
+		// Audio RTP packets are forwarded to the viewer untouched, so the audio
+		// send path only needs the track pointer and a counter. Both are atomic
+		// so no lock is taken per packet per viewer. AudioTrack is set to nil by
+		// Close() to stop further writes.
+		AudioTrack          atomic.Pointer[codecs.TrackMultiCodec]
+		AudioPacketsWritten atomic.Uint64
 		AudioLayerCurrent   atomic.Value
 
 		ChatManager *chat.Manager
