@@ -21,6 +21,10 @@ type (
 		onClose      func(string)
 		pliSender    func()
 
+		// Unix nanoseconds of the last PLI forwarded to the publisher, used to
+		// rate limit keyframe requests. Zero means "never sent".
+		lastPLISent atomic.Int64
+
 		PeerConnectionLock sync.RWMutex
 		PeerConnection     *webrtc.PeerConnection
 
