@@ -1,0 +1,52 @@
+# Keep the build context small and stop unrelated churn from busting layer
+# caches. Note: .env, .env.development and .env.production are deliberately NOT
+# ignored -- the frontend build reads them and .env.production is copied into
+# the final image.
+
+# VCS / CI / tooling
+.git
+.gitignore
+.github
+.claude
+.idea
+.vscode
+
+# Dependencies and build output
+node_modules
+**/node_modules
+web/build
+web/dist
+web/coverage
+vendor
+
+# Runtime artifacts
+logs
+profiles
+certs
+
+# Built binaries
+/broadcast-box
+BroadcastBox.exe
+*.exe
+
+# Docker / local tooling files
+Dockerfile
+.dockerignore
+docker-compose.yaml
+GoRun.ps1
+package-lock.json
+
+# Docs and examples (not needed by any build stage)
+README.md
+CONTRIBUTING.md
+LICENSE
+examples
+
+# Local env overrides
+.env.local
+.env.*.local
+
+# Media
+*.ogg
+*.h264
+.DS_Store

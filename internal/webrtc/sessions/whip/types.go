@@ -6,6 +6,7 @@ import (
 
 	"github.com/glimesh/broadcast-box/internal/chat"
 	"github.com/glimesh/broadcast-box/internal/webrtc/codecs"
+	"github.com/glimesh/broadcast-box/internal/webrtc/utils"
 	"github.com/pion/webrtc/v4"
 )
 
@@ -21,6 +22,11 @@ type (
 		TracksLock  sync.RWMutex
 		VideoTracks map[string]*VideoTrack
 		AudioTracks map[string]*AudioTrack
+
+		// Caches the rendered layers SSE event, which is identical for every
+		// viewer. Invalidated whenever the track set changes, see
+		// GetAvailableLayersEvent.
+		availableLayersEventCache utils.CachedString
 
 		// TODO: WHEPSessionsSnapshot should contain serializable state, not runtime references.
 		WHEPSessionsSnapshot atomic.Value

@@ -21,9 +21,9 @@ func getSettingEngine(isWHIP bool, tcpMuxCache map[string]ice.TCPMux, udpMuxCach
 		udpMuxOpts []ice.UDPMuxFromPortOption
 	)
 
-	setupNetworkTypes()
 	setupNAT(&settingEngine)
 	setupInterfaceFilter(&settingEngine, &udpMuxOpts)
+	setupUDPMuxBuffers(&udpMuxOpts)
 	setupUDPMux(&settingEngine, isWHIP, udpMuxCache, udpMuxOpts)
 	setupTCPMux(&settingEngine, tcpMuxCache)
 
@@ -37,28 +37,35 @@ func getSettingEngine(isWHIP bool, tcpMuxCache map[string]ice.TCPMux, udpMuxCach
 }
 
 func setupNetworkTypes() []webrtc.NetworkType {
-	networkTypesEnv := os.Getenv(environment.NetworkTypes)
-	tcpMuxForce := os.Getenv(environment.TCPMuxForce)
+	defaultNetworkTypes := []webrtc.NetworkType{webrtc.NetworkTypeUDP4, webrtc.NetworkTypeUDP6}
 
-	networkTypes := []webrtc.NetworkType{}
-	// TCP Mux Force will enforce TCP4/6 instead of requested types
-	if tcpMuxForce != "" {
-		networkTypes = []webrtc.NetworkType{
-			webrtc.NetworkTypeTCP4,
-			webrtc.NetworkTypeTCP6,
-		}
+	// TCP Mux Force enforces TCP4/6 instead of the requested types, so it wins
+	// outright rather than being merged with NETWORK_TYPES.
+	if os.Getenv(environment.TCPMuxForce) != "" {
+		return []webrtc.NetworkType{webrtc.NetworkTypeTCP4, webrtc.NetworkTypeTCP6}
 	}
 
-	if networkTypesEnv != "" {
-		for networkTypeStr := range strings.SplitSeq(networkTypesEnv, "|") {
-			networkType, err := webrtc.NewNetworkType(networkTypeStr)
-			if err != nil {
-				networkTypes = append(networkTypes, networkType)
-			}
+	networkTypesEnv := os.Getenv(environment.NetworkTypes)
+	if networkTypesEnv == "" {
+		return defaultNetworkTypes
+	}
+
+	networkTypes := []webrtc.NetworkType{}
+	for networkTypeStr := range strings.SplitSeq(networkTypesEnv, "|") {
+		networkType, err := webrtc.NewNetworkType(strings.TrimSpace(networkTypeStr))
+		if err != nil {
+			slog.Error("Ignoring unrecognised entry in NETWORK_TYPES", "networkType", networkTypeStr, "err", err)
+			continue
 		}
-	} else {
-		// No network types found, use default values
-		networkTypes = append(networkTypes, []webrtc.NetworkType{webrtc.NetworkTypeUDP4, webrtc.NetworkTypeUDP6}...)
+
+		networkTypes = append(networkTypes, networkType)
+	}
+
+	// Falling through with an empty list would leave ICE with no candidate
+	// types at all, which fails every connection. Prefer the defaults.
+	if len(networkTypes) == 0 {
+		slog.Error("NETWORK_TYPES contained no usable entries, falling back to defaults", "value", networkTypesEnv)
+		return defaultNetworkTypes
 	}
 
 	return networkTypes
@@ -90,6 +97,45 @@ func setupUDPMux(settingEngine *webrtc.SettingEngine, isWHIP bool, udpMuxCache m
 	if udpMuxPort := getUDPMuxPort(isWHIP); udpMuxPort != 0 {
 		setUDPMuxPort(isWHIP, udpMuxPort, udpMuxCache, udpMuxOpts, settingEngine)
 	}
+}
+
+// Applies socket buffer sizes to the shared UDP mux.
+//
+// The kernel's default receive buffer is commonly around 200KB. A publisher
+// sending a high bitrate stream, or a server fanning out to many viewers, can
+// fill that faster than the read loop drains it, and the kernel then silently
+// discards datagrams. Those losses look like corrupt video rather than an
+// error, so raising the buffer is often the difference between a stream that
+// glitches under load and one that does not.
+//
+// Left unset by default, since the useful value depends on bitrate, viewer
+// count and the host's net.core.rmem_max ceiling, which caps what the kernel
+// will actually grant.
+func setupUDPMuxBuffers(muxOpts *[]ice.UDPMuxFromPortOption) {
+	if size := getBufferSize(environment.UDPMuxReadBufferSize); size > 0 {
+		slog.Info("Setting UDP Mux read buffer size", "bytes", size)
+		*muxOpts = append(*muxOpts, ice.UDPMuxFromPortWithReadBufferSize(size))
+	}
+
+	if size := getBufferSize(environment.UDPMuxWriteBufferSize); size > 0 {
+		slog.Info("Setting UDP Mux write buffer size", "bytes", size)
+		*muxOpts = append(*muxOpts, ice.UDPMuxFromPortWithWriteBufferSize(size))
+	}
+}
+
+func getBufferSize(variable string) int {
+	value := os.Getenv(variable)
+	if value == "" {
+		return 0
+	}
+
+	size, err := strconv.Atoi(value)
+	if err != nil || size < 0 {
+		slog.Error("Ignoring invalid buffer size", "variable", variable, "value", value)
+		return 0
+	}
+
+	return size
 }
 
 func setupInterfaceFilter(settingEngine *webrtc.SettingEngine, muxOpts *[]ice.UDPMuxFromPortOption) {

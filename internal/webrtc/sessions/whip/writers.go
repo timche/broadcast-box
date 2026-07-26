@@ -13,8 +13,6 @@ import (
 	"github.com/pion/rtp"
 	"github.com/pion/sdp/v3"
 	"github.com/pion/webrtc/v4"
-
-	pionCodecs "github.com/pion/rtp/codecs"
 )
 
 func (w *WHIPSession) audioWriter(remoteTrack *webrtc.TrackRemote, streamKey string) {
@@ -85,22 +83,11 @@ func (w *WHIPSession) videoWriter(remoteTrack *webrtc.TrackRemote, streamKey str
 	track.Priority = w.getPrioritizedStreamingLayer(id, peerConnection.CurrentRemoteDescription().SDP)
 	track.MediaSSRC.Store(uint32(remoteTrack.SSRC()))
 
-	var depacketizer rtp.Depacketizer
 	switch codec {
-	case codecs.VideoTrackCodecH264:
-		depacketizer = &pionCodecs.H264Packet{}
-	case codecs.VideoTrackCodecH265:
-		depacketizer = &pionCodecs.H265Depacketizer{}
-	case codecs.VideoTrackCodecVP8:
-		depacketizer = &pionCodecs.VP8Packet{}
-	case codecs.VideoTrackCodecVP9:
-		depacketizer = &pionCodecs.VP9Packet{}
-	case codecs.VideoTrackCodecAV1:
-		depacketizer = &pionCodecs.AV1Depacketizer{}
-	}
-
-	if depacketizer == nil {
-		slog.Error("WHIPSession.VideoWriter.Depacketizer: No depacketizer was found for codec", "codec", codec)
+	case codecs.VideoTrackCodecH264, codecs.VideoTrackCodecH265, codecs.VideoTrackCodecVP8,
+		codecs.VideoTrackCodecVP9, codecs.VideoTrackCodecAV1:
+	default:
+		slog.Error("WHIPSession.VideoWriter.Codec: Unsupported video codec", "codec", codec)
 	}
 
 	lastTimestamp := uint32(0)
@@ -147,7 +134,7 @@ func (w *WHIPSession) videoWriter(remoteTrack *webrtc.TrackRemote, streamKey str
 		// it is not free, and the fan-out multiplies it by the viewer count.
 		now := time.Now()
 
-		isKeyframe := isPacketKeyframe(rtpPkt, codec, depacketizer)
+		isKeyframe := isPacketKeyframe(rtpPkt, codec)
 		if isKeyframe {
 			track.LastKeyFrame.Store(now)
 		}
@@ -204,25 +191,83 @@ func (w *WHIPSession) videoWriter(remoteTrack *webrtc.TrackRemote, streamKey str
 
 const (
 	naluTypeBitmask = 0x1f
+	fuStartBitmask  = 0x80
 
 	idrNALUType = 5
 	spsNALUType = 7
 	ppsNALUType = 8
+
+	stapaNALUType = 24
+	fuaNALUType   = 28
+	fubNALUType   = 29
+
+	// A STAP-A aggregation unit is prefixed with a 2 byte big endian size.
+	stapaHeaderSize = 1
+	stapaNALULength = 2
+
+	// FU indicator + FU header.
+	fuHeaderSize = 2
 )
 
-func isPacketKeyframe(pkt *rtp.Packet, codec codecs.TrackCodeType, depacketizer rtp.Depacketizer) bool {
-	if codec == codecs.VideoTrackCodecH264 {
-		nalu, err := depacketizer.Unmarshal(pkt.Payload)
+// isKeyframeNALUType reports whether a NAL unit type indicates the start of a
+// keyframe. Parameter sets (SPS/PPS) count because encoders emit them
+// immediately before an IDR.
+func isKeyframeNALUType(naluType byte) bool {
+	return naluType == idrNALUType || naluType == spsNALUType || naluType == ppsNALUType
+}
 
-		if err != nil || len(nalu) < 6 {
+// isPacketKeyframe inspects an RTP payload in place to decide whether it starts
+// a keyframe. It deliberately avoids rtp.Depacketizer: depacketizing allocates a
+// new buffer for every packet (Annex-B start codes are prepended) and mutates
+// shared fragment-reassembly state, neither of which is wanted for a read-only
+// probe running on every video packet.
+//
+// The payload is untrusted, so every index is bounds checked.
+func isPacketKeyframe(pkt *rtp.Packet, codec codecs.TrackCodeType) bool {
+	if codec != codecs.VideoTrackCodecH264 {
+		return true
+	}
+
+	payload := pkt.Payload
+	if len(payload) < 1 {
+		return false
+	}
+
+	switch naluType := payload[0] & naluTypeBitmask; {
+	// Single NAL unit packet, the payload is the NAL unit itself (RFC 6184 5.6).
+	case naluType >= 1 && naluType <= 23:
+		return isKeyframeNALUType(naluType)
+
+	// Single-time aggregation packet, walk each aggregated NAL unit (RFC 6184 5.7.1).
+	case naluType == stapaNALUType:
+		for offset := stapaHeaderSize; offset+stapaNALULength <= len(payload); {
+			naluSize := int(payload[offset])<<8 | int(payload[offset+1])
+			offset += stapaNALULength
+
+			if naluSize < 1 || offset+naluSize > len(payload) {
+				return false
+			}
+
+			if isKeyframeNALUType(payload[offset] & naluTypeBitmask) {
+				return true
+			}
+
+			offset += naluSize
+		}
+
+		return false
+
+	// Fragmentation unit, the fragmented type lives in the FU header (RFC 6184 5.8).
+	// Only the fragment carrying the start bit begins the NAL unit.
+	case naluType == fuaNALUType || naluType == fubNALUType:
+		if len(payload) < fuHeaderSize || payload[1]&fuStartBitmask == 0 {
 			return false
 		}
 
-		firstNaluType := nalu[4] & naluTypeBitmask
-		return firstNaluType == idrNALUType || firstNaluType == spsNALUType || firstNaluType == ppsNALUType
+		return isKeyframeNALUType(payload[1] & naluTypeBitmask)
 	}
 
-	return true
+	return false
 }
 
 // Helper function for getting the simulcast order and using as priority for consumers
