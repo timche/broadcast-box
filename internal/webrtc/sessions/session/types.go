@@ -27,9 +27,16 @@ type Session struct {
 	closeOnce sync.Once
 	onClose   func()
 
-	// Protects WHEPSessions
+	// Protects WHEPSessions and isClosed
 	WHEPSessionsLock sync.RWMutex
 	WHEPSessions     map[string]*whep.WHEPSession
+	isClosed         bool
+
+	// Hooks that let the owner of this session (the session manager) keep an
+	// index of WHEP sessions in sync with WHEPSessions. They are invoked while
+	// WHEPSessionsLock is held, so they must never call back into the session.
+	onWHEPSessionAdded   func(whepSessionID string, whepSession *whep.WHEPSession)
+	onWHEPSessionRemoved func(whepSessionID string)
 
 	ChatManager *chat.Manager
 
