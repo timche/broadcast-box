@@ -29,7 +29,7 @@ type (
 		PeerConnection     *webrtc.PeerConnection
 
 		// Protects VideoTrack, VideoTimestamp, VideoPacketsWritten, VideoSequenceNumber,
-		// and auto video layer selection state.
+		// and mutations of the video layer selection state.
 		VideoLock               sync.RWMutex
 		VideoTrack              *codecs.TrackMultiCodec
 		VideoTimestamp          uint32
@@ -40,9 +40,13 @@ type (
 		VideoPacketsWritten     uint64
 		VideoPacketsDropped     atomic.Uint64
 		VideoSequenceNumber     uint16
-		VideoLayerCurrent       atomic.Value
-		videoLayerPriority      int
-		videoLayerExplicit      bool
+
+		// videoLayer holds an immutable snapshot of the video layer selection state.
+		// It is written only while VideoLock is held, but may be read lock-free by
+		// the packet fan-out hot path (see GetVideoLayerOrDefault). Because the whole
+		// selection state lives behind a single pointer, a lock-free reader always
+		// observes a consistent (layer, priority, explicit) triple.
+		videoLayer atomic.Pointer[videoLayerState]
 
 		// Audio RTP packets are forwarded to the viewer untouched, so the audio
 		// send path only needs the track pointer and a counter. Both are atomic
@@ -50,8 +54,21 @@ type (
 		// Close() to stop further writes.
 		AudioTrack          atomic.Pointer[codecs.TrackMultiCodec]
 		AudioPacketsWritten atomic.Uint64
-		AudioLayerCurrent   atomic.Value
+		AudioLayerCurrent   atomic.Pointer[string]
 
 		ChatManager *chat.Manager
+	}
+
+	// videoLayerState is an immutable snapshot of the video layer selection state.
+	// Never mutate an instance once it has been published via WHEPSession.videoLayer,
+	// always publish a replacement.
+	videoLayerState struct {
+		// layer is the simulcast layer currently being forwarded ("" when unset).
+		layer string
+		// priority is the simulcast priority of layer (lower is better, 0 is unset).
+		priority int
+		// explicit reports whether layer was chosen by the viewer, in which case
+		// it must not be overridden by automatic priority based selection.
+		explicit bool
 	}
 )
