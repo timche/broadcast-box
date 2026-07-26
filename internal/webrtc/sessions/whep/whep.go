@@ -238,6 +238,12 @@ func (w *WHEPSession) ResetForNewPublisher() {
 }
 
 func (w *WHEPSession) updateVideoBitrateLocked(now time.Time) {
+	// The caller may pass a packet's ReceivedAt, which is zero if the packet
+	// was built without one.
+	if now.IsZero() {
+		return
+	}
+
 	if w.videoBitrateWindowStart.IsZero() {
 		w.videoBitrateWindowStart = now
 		return

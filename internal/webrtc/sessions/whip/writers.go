@@ -129,12 +129,16 @@ func (w *WHIPSession) videoWriter(remoteTrack *webrtc.TrackRemote, streamKey str
 		track.PacketsReceived.Add(1)
 		bitrateWindowBytes += uint64(rtpRead)
 
+		// Read once per packet and reused for the keyframe stamp, the bitrate
+		// window and every viewer's bitrate window below. time.Now is cheap but
+		// it is not free, and the fan-out multiplies it by the viewer count.
+		now := time.Now()
+
 		isKeyframe := isPacketKeyframe(rtpPkt, codec)
 		if isKeyframe {
-			track.LastKeyFrame.Store(time.Now())
+			track.LastKeyFrame.Store(now)
 		}
 
-		now := time.Now()
 		if elapsed := now.Sub(bitrateWindowStart); elapsed >= time.Second {
 			track.Bitrate.Store(uint64(float64(bitrateWindowBytes) / elapsed.Seconds()))
 			bitrateWindowStart = now
@@ -179,6 +183,7 @@ func (w *WHIPSession) videoWriter(remoteTrack *webrtc.TrackRemote, streamKey str
 				IsKeyframe:   isKeyframe,
 				TimeDiff:     timeDiff,
 				SequenceDiff: sequenceDiff,
+				ReceivedAt:   now,
 			})
 		}
 	}

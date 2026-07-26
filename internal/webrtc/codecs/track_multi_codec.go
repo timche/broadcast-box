@@ -3,6 +3,7 @@ package codecs
 import (
 	"log/slog"
 	"sync/atomic"
+	"time"
 
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4"
@@ -15,6 +16,10 @@ type TrackPacket struct {
 	SequenceDiff int
 	Codec        TrackCodeType
 	IsKeyframe   bool
+
+	// When the publisher's writer read this packet. Sampled once per packet and
+	// carried through the fan-out so each viewer does not re-read the clock.
+	ReceivedAt time.Time
 }
 
 type TrackMultiCodec struct {
