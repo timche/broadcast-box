@@ -153,6 +153,9 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
                               <div className="relative min-h-0 flex-1">
                                 <Player
                                   streamKey={streamKey}
+                                  // Only the first stream plays audio; overlapping
+                                  // audio from every tile is unusable.
+                                  muted={streamKey !== streamKeys[0]}
                                   onChatChannel={(c) => setChatChannelFor(streamKey, c)}
                                   onStreamStatusChange={handleStreamStatus}
                                 />

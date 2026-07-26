@@ -11,15 +11,33 @@ import { setupWhepConnection } from "@/lib/webrtc/whep";
 interface PlayerProps {
   streamKey: string;
   showClose?: boolean;
+  /** Start muted. Streams play with audio by default. */
+  muted?: boolean;
   onClose?: () => void;
   onStreamStatusChange?: (streamKey: string, status: StreamStatus) => void;
   /** Receives the chat connection (or `null` on teardown) when chat is enabled. */
   onChatChannel?: (connection: ChatConnection | null) => void;
 }
 
+/**
+ * Autoplay policies reject unmuted playback until the page has been interacted
+ * with, so fall back to muted playback rather than showing a stalled video.
+ * The native controls let the viewer unmute from there.
+ */
+function play(video: HTMLVideoElement): void {
+  video.play().catch(() => {
+    if (video.muted) {
+      return;
+    }
+    video.muted = true;
+    void video.play().catch(() => undefined);
+  });
+}
+
 export function Player({
   streamKey: rawStreamKey,
   showClose = false,
+  muted = false,
   onClose,
   onStreamStatusChange,
   onChatChannel,
@@ -37,14 +55,18 @@ export function Player({
 
   const { visible: controlsVisible, containerProps } = useControlsVisibility();
 
+  // Applied imperatively rather than through the `muted` attribute so a
+  // re-render never clobbers the viewer's own mute toggle.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video !== null) {
+      video.muted = muted;
+    }
+  }, [muted]);
+
   useEffect(() => {
     let currentConnection: RTCPeerConnection | null = null;
     let cancelled = false;
-
-    const video = videoRef.current;
-    if (video !== null) {
-      video.muted = true;
-    }
 
     const connect = () => {
       setupWhepConnection(streamKey, {
@@ -114,7 +136,7 @@ export function Player({
         className="size-full bg-black object-contain"
         onPlaying={() => setStreamState("Playing")}
         onLoadStart={() => setStreamState("Loading")}
-        onLoadedData={(event) => void event.currentTarget.play().catch(() => undefined)}
+        onLoadedData={(event) => play(event.currentTarget)}
         onEnded={() => setStreamState("Offline")}
       />
 
