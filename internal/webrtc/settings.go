@@ -21,7 +21,6 @@ func getSettingEngine(isWHIP bool, tcpMuxCache map[string]ice.TCPMux, udpMuxCach
 		udpMuxOpts []ice.UDPMuxFromPortOption
 	)
 
-	setupNetworkTypes()
 	setupNAT(&settingEngine)
 	setupInterfaceFilter(&settingEngine, &udpMuxOpts)
 	setupUDPMux(&settingEngine, isWHIP, udpMuxCache, udpMuxOpts)
@@ -37,28 +36,35 @@ func getSettingEngine(isWHIP bool, tcpMuxCache map[string]ice.TCPMux, udpMuxCach
 }
 
 func setupNetworkTypes() []webrtc.NetworkType {
-	networkTypesEnv := os.Getenv(environment.NetworkTypes)
-	tcpMuxForce := os.Getenv(environment.TCPMuxForce)
+	defaultNetworkTypes := []webrtc.NetworkType{webrtc.NetworkTypeUDP4, webrtc.NetworkTypeUDP6}
 
-	networkTypes := []webrtc.NetworkType{}
-	// TCP Mux Force will enforce TCP4/6 instead of requested types
-	if tcpMuxForce != "" {
-		networkTypes = []webrtc.NetworkType{
-			webrtc.NetworkTypeTCP4,
-			webrtc.NetworkTypeTCP6,
-		}
+	// TCP Mux Force enforces TCP4/6 instead of the requested types, so it wins
+	// outright rather than being merged with NETWORK_TYPES.
+	if os.Getenv(environment.TCPMuxForce) != "" {
+		return []webrtc.NetworkType{webrtc.NetworkTypeTCP4, webrtc.NetworkTypeTCP6}
 	}
 
-	if networkTypesEnv != "" {
-		for networkTypeStr := range strings.SplitSeq(networkTypesEnv, "|") {
-			networkType, err := webrtc.NewNetworkType(networkTypeStr)
-			if err != nil {
-				networkTypes = append(networkTypes, networkType)
-			}
+	networkTypesEnv := os.Getenv(environment.NetworkTypes)
+	if networkTypesEnv == "" {
+		return defaultNetworkTypes
+	}
+
+	networkTypes := []webrtc.NetworkType{}
+	for networkTypeStr := range strings.SplitSeq(networkTypesEnv, "|") {
+		networkType, err := webrtc.NewNetworkType(strings.TrimSpace(networkTypeStr))
+		if err != nil {
+			slog.Error("Ignoring unrecognised entry in NETWORK_TYPES", "networkType", networkTypeStr, "err", err)
+			continue
 		}
-	} else {
-		// No network types found, use default values
-		networkTypes = append(networkTypes, []webrtc.NetworkType{webrtc.NetworkTypeUDP4, webrtc.NetworkTypeUDP6}...)
+
+		networkTypes = append(networkTypes, networkType)
+	}
+
+	// Falling through with an empty list would leave ICE with no candidate
+	// types at all, which fails every connection. Prefer the defaults.
+	if len(networkTypes) == 0 {
+		slog.Error("NETWORK_TYPES contained no usable entries, falling back to defaults", "value", networkTypesEnv)
+		return defaultNetworkTypes
 	}
 
 	return networkTypes
