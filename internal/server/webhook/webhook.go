@@ -11,6 +11,14 @@ import (
 
 const defaultTimeout = time.Second * 5
 
+// Shared across calls so that connections (and TLS sessions) are pooled. A
+// client constructed per call gets a fresh Transport with an empty connection
+// pool, forcing a new TCP and TLS handshake for every publish and playback
+// request.
+var webhookClient = &http.Client{
+	Timeout: defaultTimeout,
+}
+
 type webhookPayload struct {
 	Action      action            `json:"action"`
 	IP          string            `json:"ip"`
@@ -52,16 +60,14 @@ func CallWebhook(url string, action action, bearerToken string, request *http.Re
 		return "", fmt.Errorf("failed to marshal payload: %w", err)
 	}
 
-	webhookRequest, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
+	webhookRequest, err := http.NewRequestWithContext(request.Context(), "POST", url, bytes.NewBuffer(jsonPayload))
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
 	webhookRequest.Header.Set("Content-Type", "application/json")
 
-	resp, err := (&http.Client{
-		Timeout: defaultTimeout,
-	}).Do(webhookRequest)
+	resp, err := webhookClient.Do(webhookRequest)
 
 	if err != nil {
 		return "", fmt.Errorf("webhook request failed after %v: %w", time.Since(start), err)

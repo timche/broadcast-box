@@ -15,6 +15,7 @@ func (m *SessionManager) Setup() {
 	slog.Debug("WHIPSessionManager.Setup")
 
 	m.sessions = make(map[string]*session.Session)
+	m.whepSessions = make(map[string]whepSessionEntry)
 }
 
 // Add new session
@@ -37,6 +38,22 @@ func (m *SessionManager) addSession(profile authorization.PublicProfile) (s *ses
 		delete(m.sessions, profile.StreamKey)
 		m.sessionsLock.Unlock()
 	})
+
+	// Keep the WHEP index in sync with the session's own WHEPSessions map.
+	// Session.close() removes every WHEP session it still holds before running
+	// the onClose hook above, so the index cannot outlive the session.
+	s.SetWHEPSessionHooks(
+		func(whepSessionID string, whepSession *whep.WHEPSession) {
+			m.whepSessionsLock.Lock()
+			m.whepSessions[whepSessionID] = whepSessionEntry{session: s, whepSession: whepSession}
+			m.whepSessionsLock.Unlock()
+		},
+		func(whepSessionID string) {
+			m.whepSessionsLock.Lock()
+			delete(m.whepSessions, whepSessionID)
+			m.whepSessionsLock.Unlock()
+		},
+	)
 
 	m.sessionsLock.Lock()
 	m.sessions[profile.StreamKey] = s
@@ -168,40 +185,16 @@ func (m *SessionManager) GetWHEPSessionByID(sessionID string) (whep *whep.WHEPSe
 	return whepSession, foundSession
 }
 
-func (m *SessionManager) SendPLIByWHEPSessionID(sessionID string) {
-	streamSession, _, foundSession := m.GetSessionAndWHEPByID(sessionID)
-	if !foundSession {
-		slog.Error("SessionManager.SendPLIByWHEPSessionID: WHEP session not found", "sessionID", sessionID)
-		return
-	}
-
-	host := streamSession.Host.Load()
-	if host == nil {
-		slog.Error(
-			"SessionManager.SendPLIByWHEPSessionID: WHIP session not found",
-			"whepSessionID", sessionID,
-			"streamKey", streamSession.StreamKey,
-		)
-		return
-	}
-
-	host.SendPLI()
-}
-
 func (m *SessionManager) GetSessionAndWHEPByID(sessionID string) (streamSession *session.Session, whepSession *whep.WHEPSession, foundSession bool) {
-	m.sessionsLock.RLock()
-	defer m.sessionsLock.RUnlock()
+	m.whepSessionsLock.RLock()
+	entry, ok := m.whepSessions[sessionID]
+	m.whepSessionsLock.RUnlock()
 
-	for _, session := range m.sessions {
-		session.WHEPSessionsLock.RLock()
-		whepSession, ok := session.WHEPSessions[sessionID]
-		session.WHEPSessionsLock.RUnlock()
-		if ok {
-			return session, whepSession, true
-		}
+	if !ok {
+		return nil, nil, false
 	}
 
-	return nil, nil, false
+	return entry.session, entry.whepSession, true
 }
 
 func (m *SessionManager) GetSessionByHostSessionID(sessionID string) (session *session.Session, foundSession bool) {

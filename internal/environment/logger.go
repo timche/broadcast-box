@@ -1,6 +1,7 @@
 package environment
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"io/fs"
@@ -17,7 +18,81 @@ import (
 var (
 	currentDate string
 	logMutex    sync.Mutex
+
+	logFileWriter *bufferedFileWriter
 )
+
+const (
+	// Large enough that a burst of log lines costs one write syscall rather
+	// than one per line.
+	logBufferSize = 32 * 1024
+
+	// How long a log line may sit in the buffer before reaching disk. Short
+	// enough that a crash loses at most this much, long enough that a busy
+	// server is not doing a syscall per line.
+	logFlushInterval = time.Second
+)
+
+// Buffers writes to the log file so that a busy server is not issuing a write
+// syscall for every log line. bufio.Writer is not safe for concurrent use and
+// the flush loop runs alongside the loggers, so access is serialised here.
+//
+// Only the file is buffered. os.Stdout is left unbuffered so container log
+// collectors still see output immediately.
+type bufferedFileWriter struct {
+	mutex  sync.Mutex
+	buffer *bufio.Writer
+	file   *os.File
+}
+
+func newBufferedFileWriter(file *os.File) *bufferedFileWriter {
+	return &bufferedFileWriter{
+		buffer: bufio.NewWriterSize(file, logBufferSize),
+		file:   file,
+	}
+}
+
+func (w *bufferedFileWriter) Write(p []byte) (int, error) {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+
+	return w.buffer.Write(p)
+}
+
+func (w *bufferedFileWriter) Flush() {
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+
+	if err := w.buffer.Flush(); err != nil {
+		fmt.Fprintf(os.Stderr, "failed flushing log buffer: %v\n", err)
+	}
+}
+
+// Flushes anything still buffered and closes the underlying file. Used when
+// rotating to a new day's file so the old one is not left truncated.
+func (w *bufferedFileWriter) Close() {
+	w.Flush()
+
+	w.mutex.Lock()
+	defer w.mutex.Unlock()
+
+	if err := w.file.Close(); err != nil {
+		fmt.Fprintf(os.Stderr, "failed closing log file: %v\n", err)
+	}
+}
+
+// FlushLogs writes any buffered log output to disk immediately. Anything that
+// reads the log file back, or is about to terminate the process, should call
+// this first.
+func FlushLogs() {
+	logMutex.Lock()
+	writer := logFileWriter
+	logMutex.Unlock()
+
+	if writer != nil {
+		writer.Flush()
+	}
+}
 
 func SetupLogger() {
 	slog.SetLogLoggerLevel(parseLogLevel())
@@ -50,25 +125,55 @@ func setupLoggerForDate(date string) {
 		return
 	}
 
-	log.SetOutput(io.MultiWriter(os.Stdout, logFile))
+	previous := logFileWriter
+	logFileWriter = newBufferedFileWriter(logFile)
+
+	log.SetOutput(io.MultiWriter(os.Stdout, logFileWriter))
 	currentDate = date
+
+	// Only after the new writer is installed, so no line is written to a
+	// closed file.
+	if previous != nil {
+		previous.Close()
+	}
 }
 
 func startLogRotation() {
 	go func() {
-		for {
-			now := time.Now().Format("20060102")
+		ticker := time.NewTicker(logFlushInterval)
+		defer ticker.Stop()
+
+		lastRotationCheck := time.Now()
+
+		for range ticker.C {
 			logMutex.Lock()
-			if now != currentDate {
-				setupLoggerForDate(now)
+
+			// The date only needs checking occasionally; flushing is what the
+			// fast tick is for.
+			if time.Since(lastRotationCheck) >= time.Minute {
+				lastRotationCheck = time.Now()
+
+				if now := time.Now().Format("20060102"); now != currentDate {
+					setupLoggerForDate(now)
+				}
 			}
+
+			writer := logFileWriter
 			logMutex.Unlock()
-			time.Sleep(1 * time.Minute)
+
+			if writer != nil {
+				writer.Flush()
+			}
 		}
 	}()
 }
 
 func GetLogFileReader() (logFile *os.File, err error) {
+	// The admin log view reads the file straight off disk, so anything still
+	// sitting in the write buffer has to be pushed out first or the most
+	// recent lines would be missing.
+	FlushLogs()
+
 	logDir, _, _ := getLogfilePath()
 	logFilePath, err := getLatestLogFile(logDir)
 	if err != nil {
