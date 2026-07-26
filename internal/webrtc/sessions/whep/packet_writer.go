@@ -15,21 +15,18 @@ func (w *WHEPSession) SendAudioPacket(packet codecs.TrackPacket) {
 		return
 	}
 
-	w.AudioLock.Lock()
-	if w.AudioTrack == nil {
-		w.AudioLock.Unlock()
+	audioTrack := w.AudioTrack.Load()
+	if audioTrack == nil {
 		return
 	}
 
-	w.AudioPacketsWritten += 1
-	w.AudioTimestamp = uint32(int64(w.AudioTimestamp) + packet.TimeDiff)
-	audioTrack := w.AudioTrack
-	w.AudioLock.Unlock()
+	w.AudioPacketsWritten.Add(1)
 
+	// Audio packets are forwarded unmodified, no timestamp/sequence rewrite.
 	if err := audioTrack.WriteRTP(packet.Packet, packet.Codec); err != nil {
 		if errors.Is(err, io.ErrClosedPipe) {
 			slog.Info("WHEPSession.SendAudioPacket.ConnectionDropped")
-			w.Close()
+			w.closeAsync()
 		} else {
 			slog.Error("WHEPSession.SendAudioPacket.Error", "err", err)
 		}
@@ -74,7 +71,7 @@ func (w *WHEPSession) SendVideoPacket(packet codecs.TrackPacket) {
 
 		if errors.Is(err, io.ErrClosedPipe) {
 			slog.Info("WHEPSession.SendVideoPacket.ConnectionDropped")
-			w.Close()
+			w.closeAsync()
 		} else {
 			slog.Error("WHEPSession.SendVideoPacket.Error", "err", err)
 		}

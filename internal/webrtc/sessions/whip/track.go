@@ -13,9 +13,9 @@ import (
 func (w *WHIPSession) addAudioTrack(rid string, streamKey string, codec codecs.TrackCodeType) (*AudioTrack, error) {
 	slog.Info("WHIPSession.AddAudioTrack", "streamKey", streamKey, "rid", rid)
 	w.TracksLock.Lock()
-	defer w.TracksLock.Unlock()
 
 	if existingTrack, ok := w.AudioTracks[rid]; ok {
+		w.TracksLock.Unlock()
 		return existingTrack, nil
 	}
 
@@ -31,6 +31,9 @@ func (w *WHIPSession) addAudioTrack(rid string, streamKey string, codec codecs.T
 	track.LastReceived.Store(time.Time{})
 
 	w.AudioTracks[track.Rid] = track
+	w.TracksLock.Unlock()
+
+	w.invalidateAvailableLayersEvent()
 
 	return track, nil
 }
@@ -39,9 +42,9 @@ func (w *WHIPSession) addAudioTrack(rid string, streamKey string, codec codecs.T
 func (w *WHIPSession) addVideoTrack(rid string, streamKey string, codec codecs.TrackCodeType) (*VideoTrack, error) {
 	slog.Info("WHIPSession.AddVideoTrack", "rid", rid)
 	w.TracksLock.Lock()
-	defer w.TracksLock.Unlock()
 
 	if existingTrack, ok := w.VideoTracks[rid]; ok {
+		w.TracksLock.Unlock()
 		return existingTrack, nil
 	}
 
@@ -57,6 +60,9 @@ func (w *WHIPSession) addVideoTrack(rid string, streamKey string, codec codecs.T
 	track.LastReceived.Store(time.Time{})
 
 	w.VideoTracks[rid] = track
+	w.TracksLock.Unlock()
+
+	w.invalidateAvailableLayersEvent()
 
 	return track, nil
 }
@@ -69,4 +75,6 @@ func (w *WHIPSession) RemoveTracks() {
 	w.AudioTracks = make(map[string]*AudioTrack)
 	w.VideoTracks = make(map[string]*VideoTrack)
 	w.TracksLock.Unlock()
+
+	w.invalidateAvailableLayersEvent()
 }

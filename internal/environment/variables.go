@@ -37,6 +37,8 @@ const (
 	TCPMuxAddress            = "TCP_MUX_ADDRESS"
 	InterfaceFilter          = "INTERFACE_FILTER"
 	UDPMuxPort               = "UDP_MUX_PORT"
+	UDPMuxReadBufferSize     = "UDP_MUX_READ_BUFFER_SIZE"
+	UDPMuxWriteBufferSize    = "UDP_MUX_WRITE_BUFFER_SIZE"
 	UDPMuxPortWHIP           = "UDP_MUX_PORT_WHIP"
 	UDPMuxPortWHEP           = "UDP_MUX_PORT_WHEP"
 	NAT1To1IP                = "NAT_1_TO_1_IP"

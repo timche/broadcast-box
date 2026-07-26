@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/glimesh/broadcast-box/internal/environment"
@@ -17,7 +18,7 @@ func GetServeMuxHandler() http.HandlerFunc {
 	serverMux := http.NewServeMux()
 
 	if os.Getenv(environment.FrontendDisabled) == "" {
-		serverMux.HandleFunc("/", frontendHandler)
+		serverMux.HandleFunc("/", newFrontendHandler(environment.GetFrontendPath()))
 	}
 
 	// WHIP/WHEP shared endpoints
@@ -83,16 +84,34 @@ func corsHandler(next func(responseWriter http.ResponseWriter, request *http.Req
 	}
 }
 
-func frontendHandler(response http.ResponseWriter, request *http.Request) {
-	frontendFilePath := environment.GetFrontendPath()
-
+// newFrontendHandler builds the file system and file server once, up front, so
+// that they are not reallocated on every request. The returned handler serves
+// any file that exists underneath frontendFilePath and falls back to
+// index.html for everything else, so that client side routing keeps working.
+func newFrontendHandler(frontendFilePath string) http.HandlerFunc {
 	fileSystem := http.Dir(frontendFilePath)
 	fileServer := http.FileServer(fileSystem)
-	_, err := fileSystem.Open(path.Clean(request.URL.Path))
+	indexFilePath := filepath.Join(frontendFilePath, "index.html")
 
-	if errors.Is(err, os.ErrNotExist) {
-		http.ServeFile(response, request, frontendFilePath+"/index.html")
-	} else {
-		fileServer.ServeHTTP(response, request)
+	return func(response http.ResponseWriter, request *http.Request) {
+		// http.Dir.Open performs the path containment for us: it cleans the
+		// requested path against "/" before joining it to the root, so a
+		// traversal attempt such as "/../secret.txt" resolves inside
+		// frontendFilePath instead of escaping it. Doing this probe with
+		// os.Stat would require replicating that containment by hand.
+		file, err := fileSystem.Open(path.Clean(request.URL.Path))
+		if err == nil {
+			// The probe only cares whether the file exists. Closing it
+			// immediately avoids leaking a descriptor per request. Nothing was
+			// read from the handle, so a close error carries no information
+			// worth acting on or logging per request.
+			_ = file.Close()
+		}
+
+		if errors.Is(err, os.ErrNotExist) {
+			http.ServeFile(response, request, indexFilePath)
+		} else {
+			fileServer.ServeHTTP(response, request)
+		}
 	}
 }
