@@ -9,7 +9,14 @@ import (
 )
 
 const (
-	DefaultMaxHistory      = 10000
+	DefaultMaxHistory = 10000
+
+	// How many past messages a client that has never connected before is sent.
+	// Retention (DefaultMaxHistory) is deliberately much larger: it exists so a
+	// reconnecting client can be caught up on what it missed, not so that every
+	// new viewer is served the entire backlog.
+	DefaultMaxReplay = 200
+
 	DefaultTTL             = 72 * time.Hour
 	DefaultCleanupInterval = 1 * time.Hour
 
@@ -61,6 +68,13 @@ func NewManager() *Manager {
 		}
 	}
 
+	maxReplay := DefaultMaxReplay
+	if val := os.Getenv(environment.ChatMaxReplay); val != "" {
+		if i, err := strconv.Atoi(val); err == nil {
+			maxReplay = i
+		}
+	}
+
 	defaultTTL := DefaultTTL
 	if val := os.Getenv(environment.ChatDefaultTTL); val != "" {
 		if d, err := time.ParseDuration(val); err == nil {
@@ -75,7 +89,7 @@ func NewManager() *Manager {
 		}
 	}
 
-	m := NewManagerWithStore(NewInMemoryStore(maxHistory), defaultTTL, cleanupInterval)
+	m := NewManagerWithStore(NewInMemoryStoreWithReplay(maxHistory, maxReplay), defaultTTL, cleanupInterval)
 
 	return m
 }

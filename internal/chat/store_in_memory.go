@@ -2,6 +2,7 @@ package chat
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -47,18 +48,63 @@ type InMemoryStore struct {
 	rooms      map[string]*room
 	sessions   map[string]*storedSession
 	maxHistory int
+	maxReplay  int
 }
 
 func NewInMemoryStore(maxHistory int) *InMemoryStore {
+	return NewInMemoryStoreWithReplay(maxHistory, DefaultMaxReplay)
+}
+
+func NewInMemoryStoreWithReplay(maxHistory int, maxReplay int) *InMemoryStore {
 	if maxHistory <= 0 {
 		maxHistory = DefaultMaxHistory
+	}
+
+	if maxReplay <= 0 {
+		maxReplay = DefaultMaxReplay
+	}
+
+	// Replaying more than is retained is not meaningful.
+	if maxReplay > maxHistory {
+		maxReplay = maxHistory
 	}
 
 	return &InMemoryStore{
 		rooms:      make(map[string]*room),
 		sessions:   make(map[string]*storedSession),
 		maxHistory: maxHistory,
+		maxReplay:  maxReplay,
 	}
+}
+
+// Builds the backlog handed to a newly subscribed client. Callers must hold the
+// room lock.
+//
+// A client reconnecting with lastEventID gets everything it missed, so no
+// message is lost across a dropped connection. A fresh client gets only the
+// most recent maxReplay events: retention exists so reconnects can be filled,
+// not so that every new viewer is served the entire history.
+func (r *room) replayLocked(lastEventID uint64, maxReplay int) []Event {
+	start := 0
+
+	if lastEventID > 0 {
+		// history is append-only with ascending IDs, so the first event newer
+		// than lastEventID marks the start of what the client missed.
+		start = sort.Search(len(r.history), func(i int) bool {
+			return r.history[i].ID > lastEventID
+		})
+	} else if len(r.history) > maxReplay {
+		start = len(r.history) - maxReplay
+	}
+
+	if start >= len(r.history) {
+		return nil
+	}
+
+	history := make([]Event, len(r.history)-start)
+	copy(history, r.history[start:])
+
+	return history
 }
 
 // Looks up a session and bumps its activity timestamp under a read lock.
@@ -202,24 +248,7 @@ func (s *InMemoryStore) subscribeToRoom(r *room, lastEventID uint64, now time.Ti
 	ch := make(chan Event, 100)
 	r.subscribers[subID] = &subscriber{ch: ch}
 
-	var history []Event
-	if lastEventID > 0 {
-		count := 0
-		for _, ev := range r.history {
-			if ev.ID > lastEventID {
-				count++
-			}
-		}
-		history = make([]Event, 0, count)
-		for _, ev := range r.history {
-			if ev.ID > lastEventID {
-				history = append(history, ev)
-			}
-		}
-	} else {
-		history = make([]Event, len(r.history))
-		copy(history, r.history)
-	}
+	history := r.replayLocked(lastEventID, s.maxReplay)
 
 	cleanup := func() {
 		r.mu.Lock()
