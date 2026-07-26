@@ -44,6 +44,7 @@ func LoadEnvironmentVariables() {
 	}
 
 	setDefaultEnvironmentVariables()
+	ResolveEnvironmentVariables()
 }
 
 func loadConfigs() error {

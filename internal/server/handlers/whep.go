@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"mime"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/glimesh/broadcast-box/internal/environment"
@@ -59,7 +58,7 @@ func whepHandler(responseWriter http.ResponseWriter, request *http.Request) {
 		return
 	}
 
-	if webhookURL := os.Getenv(environment.WebhookURL); webhookURL != "" {
+	if webhookURL := environment.GetWebhookURL(); webhookURL != "" {
 		token, err = webhook.CallWebhook(webhookURL, webhook.WHEPConnect, token, request)
 		if err != nil {
 			responseWriter.WriteHeader(http.StatusUnauthorized)

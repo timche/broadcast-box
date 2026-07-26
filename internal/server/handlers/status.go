@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"os"
 
 	"github.com/glimesh/broadcast-box/internal/environment"
 	"github.com/glimesh/broadcast-box/internal/server/helpers"
@@ -56,7 +55,7 @@ func sessionStatusesHandler(responseWriter http.ResponseWriter, request *http.Re
 		return
 	}
 
-	if isDisabled := os.Getenv(environment.DisableStatus); isDisabled != "" {
+	if environment.IsStatusDisabled() {
 		helpers.LogHTTPError(
 			responseWriter,
 			"Status Service Unavailable",

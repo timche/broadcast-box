@@ -18,6 +18,12 @@ type whipWebhookPayload struct {
 }
 
 func TestWHIPHandlerWebhookUsesResolvedStreamKey(t *testing.T) {
+	// The handler reads the stream profile policy and webhook URL from the
+	// snapshot taken at startup, so re-resolve after the t.Setenv calls below.
+	// Registered before them so that cleanup runs in LIFO order: the environment
+	// is restored first, then re-snapshotted.
+	t.Cleanup(environment.ResolveEnvironmentVariables)
+
 	t.Setenv(environment.StreamProfilePath, t.TempDir())
 	t.Setenv(environment.StreamProfilePolicy, authorization.StreamPolicyReservedOnly)
 
@@ -38,6 +44,7 @@ func TestWHIPHandlerWebhookUsesResolvedStreamKey(t *testing.T) {
 	defer server.Close()
 
 	t.Setenv(environment.WebhookURL, server.URL)
+	environment.ResolveEnvironmentVariables()
 
 	req := httptest.NewRequest(http.MethodPost, "/api/whip", strings.NewReader("v=0"))
 	req.Header.Set("Authorization", "Bearer "+bearerToken)

@@ -2,14 +2,12 @@ package utils
 
 import (
 	"log/slog"
-	"os"
-	"strings"
 
 	"github.com/glimesh/broadcast-box/internal/environment"
 )
 
 func DebugOutputOffer(offer string) string {
-	if strings.EqualFold(os.Getenv(environment.DebugPrintOffer), "true") {
+	if environment.ShouldDebugPrintOffer() {
 		slog.Info("Offer", "sdp", offer)
 	}
 
@@ -17,7 +15,7 @@ func DebugOutputOffer(offer string) string {
 }
 
 func DebugOutputAnswer(answer string) string {
-	if strings.EqualFold(os.Getenv(environment.DebugPrintAnswer), "true") {
+	if environment.ShouldDebugPrintAnswer() {
 		slog.Info("Answer", "sdp", answer)
 	}
 
