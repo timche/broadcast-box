@@ -1,5 +1,15 @@
 package whep
 
+// Unlike the video path, the WHEP session forwards audio RTP packets exactly as
+// they arrive from the publisher, so it never tracks an outbound audio
+// timestamp or sequence number of its own. These constants preserve the values
+// the status API has always reported for those fields so the API contract
+// (and its consumers in web/src) stays unchanged.
+const (
+	audioTimestampReported      = 5000
+	audioSequenceNumberReported = 0
+)
+
 type SessionState struct {
 	ID string `json:"id"`
 

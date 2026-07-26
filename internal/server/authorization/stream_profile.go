@@ -17,9 +17,13 @@ const (
 	StreamPolicyReservedOnly = "RESERVED"
 )
 
+// Stream keys become part of a profile's filename, so the pattern is anchored:
+// an unanchored match succeeds on any string merely *containing* a legal
+// character, which would let a key like "../evil" through.
+var streamKeyPattern = regexp.MustCompile(`^[\p{L}\p{N}_-]+$`)
+
 func isValidStreamKey(streamKey string) bool {
-	regExp := regexp.MustCompile(`[\p{L}\p{N}_-]+`)
-	return regExp.MatchString(streamKey)
+	return streamKeyPattern.MatchString(streamKey)
 }
 
 // Create a new profile for the provided streamkey
@@ -59,6 +63,8 @@ func CreateProfile(streamKey string) (string, error) {
 		return "", err
 	}
 
+	profileFiles.addName(fileName)
+
 	return token, nil
 }
 
@@ -92,6 +98,9 @@ func UpdateProfile(token string, motd string, isPublic bool) error {
 	}
 
 	slog.Info("Authorization: Updated Profile", "streamKey", profile.StreamKey)
+
+	// Only the contents of the file change here, the file name is untouched, so
+	// the profile file index stays valid as is.
 	err = os.WriteFile(filepath.Join(profilePath, profileFilePath), jsonData, 0644)
 	if err != nil {
 		slog.Error("Authorization: Error ocurred while trying to update profile", "err", err)
@@ -118,6 +127,8 @@ func RemoveProfile(streamKey string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+
+	profileFiles.removeName(fileName)
 
 	return true, nil
 }
@@ -234,6 +245,8 @@ func ResetProfileToken(streamKey string) error {
 	if err := os.Rename(currentPath, newPath); err != nil {
 		return fmt.Errorf("authorization: error updating profile token for %s", streamKey)
 	}
+
+	profileFiles.renameName(fileName, newFileName)
 
 	return nil
 }

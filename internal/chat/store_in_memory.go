@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,10 +22,31 @@ type room struct {
 	lastActivity time.Time
 }
 
+// The stored form of a chat session. lastActivity is atomic so that the hot
+// paths (send, touch, lookup), which only need to bump it, can hold a read lock
+// on the store instead of an exclusive one.
+type storedSession struct {
+	id           string
+	streamKey    string
+	lastActivity atomic.Int64
+}
+
+func (s *storedSession) touch(now time.Time) {
+	s.lastActivity.Store(now.UnixNano())
+}
+
+func (s *storedSession) snapshot() *Session {
+	return &Session{
+		ID:           s.id,
+		StreamKey:    s.streamKey,
+		LastActivity: time.Unix(0, s.lastActivity.Load()),
+	}
+}
+
 type InMemoryStore struct {
 	mu         sync.RWMutex
 	rooms      map[string]*room
-	sessions   map[string]*Session
+	sessions   map[string]*storedSession
 	maxHistory int
 	maxReplay  int
 }
@@ -49,7 +71,7 @@ func NewInMemoryStoreWithReplay(maxHistory int, maxReplay int) *InMemoryStore {
 
 	return &InMemoryStore{
 		rooms:      make(map[string]*room),
-		sessions:   make(map[string]*Session),
+		sessions:   make(map[string]*storedSession),
 		maxHistory: maxHistory,
 		maxReplay:  maxReplay,
 	}
@@ -85,60 +107,82 @@ func (r *room) replayLocked(lastEventID uint64, maxReplay int) []Event {
 	return history
 }
 
-func (s *InMemoryStore) Connect(streamKey string, now time.Time) string {
+// Looks up a session and bumps its activity timestamp under a read lock.
+func (s *InMemoryStore) lookupAndTouch(sessionID string, now time.Time) (*storedSession, bool) {
+	s.mu.RLock()
+	session, ok := s.sessions[sessionID]
+	s.mu.RUnlock()
+
+	if !ok {
+		return nil, false
+	}
+
+	session.touch(now)
+
+	return session, true
+}
+
+// Returns an existing room under a read lock, falling back to the write lock
+// only when the room has to be created.
+func (s *InMemoryStore) getOrCreateRoom(streamKey string, now time.Time) *room {
+	s.mu.RLock()
+	r, ok := s.rooms[streamKey]
+	s.mu.RUnlock()
+
+	if ok {
+		r.mu.Lock()
+		r.lastActivity = now
+		r.mu.Unlock()
+
+		return r
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	sessionID := uuid.New().String()
-	s.sessions[sessionID] = &Session{
-		ID:           sessionID,
-		StreamKey:    streamKey,
-		LastActivity: now,
-	}
+	return s.getOrCreateRoomLocked(streamKey, now)
+}
 
+func (s *InMemoryStore) Connect(streamKey string, now time.Time) string {
+	sessionID := uuid.New().String()
+	session := &storedSession{
+		id:        sessionID,
+		streamKey: streamKey,
+	}
+	session.touch(now)
+
+	s.mu.Lock()
+	s.sessions[sessionID] = session
 	s.getOrCreateRoomLocked(streamKey, now)
+	s.mu.Unlock()
 
 	return sessionID
 }
 
 func (s *InMemoryStore) GetSession(sessionID string, now time.Time) (*Session, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	session, ok := s.sessions[sessionID]
+	session, ok := s.lookupAndTouch(sessionID, now)
 	if !ok {
 		return nil, false
 	}
 
-	session.LastActivity = now
-	copy := *session
-	return &copy, true
+	return session.snapshot(), true
 }
 
 func (s *InMemoryStore) TouchSession(sessionID string, now time.Time) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	_, ok := s.lookupAndTouch(sessionID, now)
 
-	session, ok := s.sessions[sessionID]
-	if !ok {
-		return false
-	}
-
-	session.LastActivity = now
-	return true
+	return ok
 }
 
 func (s *InMemoryStore) Subscribe(sessionID string, lastEventID uint64, now time.Time) (chan Event, func(), []Event, error) {
-	s.mu.Lock()
-	session, ok := s.sessions[sessionID]
+	session, ok := s.lookupAndTouch(sessionID, now)
 	if !ok {
-		s.mu.Unlock()
 		return nil, nil, nil, fmt.Errorf("invalid session")
 	}
 
-	session.LastActivity = now
-	r, ok := s.rooms[session.StreamKey]
-	s.mu.Unlock()
+	s.mu.RLock()
+	r, ok := s.rooms[session.streamKey]
+	s.mu.RUnlock()
 
 	if !ok {
 		return nil, nil, nil, fmt.Errorf("room not found")
@@ -148,40 +192,31 @@ func (s *InMemoryStore) Subscribe(sessionID string, lastEventID uint64, now time
 }
 
 func (s *InMemoryStore) SubscribeStream(streamKey string, lastEventID uint64, now time.Time) (chan Event, func(), []Event, error) {
-	s.mu.Lock()
-	r := s.getOrCreateRoomLocked(streamKey, now)
-	s.mu.Unlock()
-
-	return s.subscribeToRoom(r, lastEventID, now)
+	return s.subscribeToRoom(s.getOrCreateRoom(streamKey, now), lastEventID, now)
 }
 
 func (s *InMemoryStore) Send(sessionID string, text string, displayName string, now time.Time) error {
-	s.mu.Lock()
-	session, ok := s.sessions[sessionID]
+	session, ok := s.lookupAndTouch(sessionID, now)
 	if !ok {
-		s.mu.Unlock()
 		return fmt.Errorf("invalid session")
 	}
 
-	session.LastActivity = now
-	streamKey := session.StreamKey
-	r, ok := s.rooms[streamKey]
-	s.mu.Unlock()
+	s.mu.RLock()
+	r, ok := s.rooms[session.streamKey]
+	s.mu.RUnlock()
 
 	if !ok {
 		return fmt.Errorf("room not found")
 	}
 
 	s.sendToRoom(r, text, displayName, now)
+
 	return nil
 }
 
 func (s *InMemoryStore) SendToStream(streamKey string, text string, displayName string, now time.Time) error {
-	s.mu.Lock()
-	r := s.getOrCreateRoomLocked(streamKey, now)
-	s.mu.Unlock()
+	s.sendToRoom(s.getOrCreateRoom(streamKey, now), text, displayName, now)
 
-	s.sendToRoom(r, text, displayName, now)
 	return nil
 }
 
@@ -190,7 +225,7 @@ func (s *InMemoryStore) Cleanup(now time.Time, ttl time.Duration) {
 	defer s.mu.Unlock()
 
 	for id, session := range s.sessions {
-		if now.Sub(session.LastActivity) > ttl {
+		if now.Sub(time.Unix(0, session.lastActivity.Load())) > ttl {
 			delete(s.sessions, id)
 		}
 	}

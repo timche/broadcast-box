@@ -26,10 +26,10 @@ func startHTTPSServer(serverMux http.HandlerFunc) {
 		os.Exit(1)
 	}
 
-	server := &http.Server{
+	server := applyTimeouts(&http.Server{
 		Handler: serverMux,
 		Addr:    getHTTPSAddress(),
-	}
+	})
 
 	cert, err := tls.LoadX509KeyPair(sslCert, sslKey)
 	if err != nil {

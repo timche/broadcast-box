@@ -24,9 +24,7 @@ func CreateNewWHEP(
 	w = &WHEPSession{
 		SessionID:               whepSessionID,
 		StreamKey:               streamKey,
-		AudioTrack:              audioTrack,
 		VideoTrack:              videoTrack,
-		AudioTimestamp:          5000,
 		VideoTimestamp:          5000,
 		PeerConnection:          peerConnection,
 		pliSender:               pliSender,
@@ -34,6 +32,7 @@ func CreateNewWHEP(
 		ChatManager:             chatManager,
 	}
 
+	w.AudioTrack.Store(audioTrack)
 	w.AudioLayerCurrent.Store("")
 	w.VideoLayerCurrent.Store("")
 	w.IsWaitingForKeyframe.Store(true)
@@ -57,19 +56,33 @@ func (w *WHEPSession) Close() {
 		slog.Debug("WHEPSession.Close.PeerConnection.GracefulClose.Completed")
 
 		// Empty tracks
-		w.AudioLock.Lock()
+		w.AudioTrack.Store(nil)
+
 		w.VideoLock.Lock()
-
-		w.AudioTrack = nil
 		w.VideoTrack = nil
-
 		w.VideoLock.Unlock()
-		w.AudioLock.Unlock()
 
 		if w.onClose != nil {
 			w.onClose(w.SessionID)
 		}
 	})
+}
+
+// Tears the session down without blocking the caller.
+//
+// The packet writers run on the publisher's read goroutine, which fans a
+// single RTP packet out to every viewer in turn. Anything they block on stalls
+// delivery to every other viewer and backs the publisher's receive buffer up
+// until it drops packets. Close() closes a PeerConnection and rebuilds the
+// host's session snapshot, which is far too slow to sit on that path.
+//
+// IsSessionClosed is set synchronously so that following packets short-circuit
+// at the top of SendVideoPacket/SendAudioPacket rather than spawning a
+// goroutine each. Close() sets it again inside its sync.Once, which is
+// harmless.
+func (w *WHEPSession) closeAsync() {
+	w.IsSessionClosed.Store(true)
+	go w.Close()
 }
 
 func (w *WHEPSession) SetOnClose(onClose func(string)) {
@@ -78,7 +91,8 @@ func (w *WHEPSession) SetOnClose(onClose func(string)) {
 
 // Get the current status of the WHEP session
 func (w *WHEPSession) GetWHEPSessionStatus() (state SessionState) {
-	w.AudioLock.RLock()
+	audioPacketsWritten := w.AudioPacketsWritten.Load()
+
 	w.VideoLock.Lock()
 	w.updateVideoBitrateLocked(time.Now())
 
@@ -89,9 +103,9 @@ func (w *WHEPSession) GetWHEPSessionStatus() (state SessionState) {
 		ID: w.SessionID,
 
 		AudioLayerCurrent:   currentAudioLayer,
-		AudioTimestamp:      w.AudioTimestamp,
-		AudioPacketsWritten: w.AudioPacketsWritten,
-		AudioSequenceNumber: uint64(w.AudioSequenceNumber),
+		AudioTimestamp:      audioTimestampReported,
+		AudioPacketsWritten: audioPacketsWritten,
+		AudioSequenceNumber: audioSequenceNumberReported,
 
 		VideoLayerCurrent:   currentVideoLayer,
 		VideoTimestamp:      w.VideoTimestamp,
@@ -102,7 +116,6 @@ func (w *WHEPSession) GetWHEPSessionStatus() (state SessionState) {
 	}
 
 	w.VideoLock.Unlock()
-	w.AudioLock.RUnlock()
 
 	return
 }
@@ -112,7 +125,7 @@ func (w *WHEPSession) SetAudioLayer(encodingID string) {
 	slog.Debug("Setting Audio Layer")
 	w.AudioLayerCurrent.Store(encodingID)
 	w.IsWaitingForKeyframe.Store(true)
-	w.SendPLI()
+	w.sendPLINow()
 }
 
 // Sets the requested video layer for this WHEP session.
@@ -126,14 +139,53 @@ func (w *WHEPSession) SetVideoLayer(encodingID string) {
 	w.VideoLock.Unlock()
 
 	w.IsWaitingForKeyframe.Store(true)
-	w.SendPLI()
+	w.sendPLINow()
 }
 
+// Minimum time between two PLIs forwarded to the publisher for a single WHEP
+// session. While a viewer waits for a keyframe every non-keyframe packet asks
+// for a PLI, so on a 3000 packet/sec stream an ungated path would send ~3000
+// RTCP messages per second per viewer back at the broadcaster. The tradeoff:
+// too frequent is a feedback storm (amplified by every viewer being reset at
+// once when a publisher reconnects), too slow means a joining viewer waits
+// longer for its first frame if a keyframe request is lost.
+const minPLIInterval = 500 * time.Millisecond
+
+// Requests a keyframe from the publisher, rate limited to at most one PLI per
+// minPLIInterval for this session. The first PLI of a session is always sent
+// immediately.
 func (w *WHEPSession) SendPLI() {
 	if w.IsSessionClosed.Load() {
 		return
 	}
 
+	now := time.Now().UnixNano()
+	last := w.lastPLISent.Load()
+
+	// A zero lastPLISent means no PLI has ever been sent for this session, so
+	// send right away rather than waiting out an interval.
+	if last != 0 && now-last < int64(minPLIInterval) {
+		return
+	}
+
+	// CompareAndSwap makes sure that of any number of concurrent callers
+	// observing the same `last`, exactly one gets through the gate.
+	if !w.lastPLISent.CompareAndSwap(last, now) {
+		return
+	}
+
+	w.pliSender()
+}
+
+// Requests a keyframe from the publisher immediately, bypassing the rate
+// limiter. Used for deliberate, low frequency actions (such as a viewer
+// switching layers) where the new video must start as soon as possible.
+func (w *WHEPSession) sendPLINow() {
+	if w.IsSessionClosed.Load() {
+		return
+	}
+
+	w.lastPLISent.Store(time.Now().UnixNano())
 	w.pliSender()
 }
 
