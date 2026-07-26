@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func newTestWHEPSession(counter *atomic.Int64) *WHEPSession {
+func newPLITestSession(counter *atomic.Int64) *WHEPSession {
 	w := &WHEPSession{
 		SessionID: "test-session",
 		pliSender: func() {
@@ -21,7 +21,7 @@ func newTestWHEPSession(counter *atomic.Int64) *WHEPSession {
 
 func TestSendPLIIsRateLimited(t *testing.T) {
 	sent := atomic.Int64{}
-	w := newTestWHEPSession(&sent)
+	w := newPLITestSession(&sent)
 
 	const callCount = 10000
 	for i := 0; i < callCount; i++ {
@@ -42,7 +42,7 @@ func TestSendPLIIsRateLimited(t *testing.T) {
 
 func TestSendPLIFirstCallIsImmediate(t *testing.T) {
 	sent := atomic.Int64{}
-	w := newTestWHEPSession(&sent)
+	w := newPLITestSession(&sent)
 
 	if last := w.lastPLISent.Load(); last != 0 {
 		t.Fatalf("expected zero valued lastPLISent, got %d", last)
@@ -57,7 +57,7 @@ func TestSendPLIFirstCallIsImmediate(t *testing.T) {
 
 func TestSendPLISendsAgainAfterInterval(t *testing.T) {
 	sent := atomic.Int64{}
-	w := newTestWHEPSession(&sent)
+	w := newPLITestSession(&sent)
 
 	w.SendPLI()
 	w.SendPLI()
@@ -78,7 +78,7 @@ func TestSendPLISendsAgainAfterInterval(t *testing.T) {
 
 func TestSendPLIConcurrentCallersOnlySendOnce(t *testing.T) {
 	sent := atomic.Int64{}
-	w := newTestWHEPSession(&sent)
+	w := newPLITestSession(&sent)
 
 	const goroutines = 32
 	const callsPerGoroutine = 100
@@ -107,7 +107,7 @@ func TestSendPLIConcurrentCallersOnlySendOnce(t *testing.T) {
 
 func TestSendPLINowBypassesRateLimit(t *testing.T) {
 	sent := atomic.Int64{}
-	w := newTestWHEPSession(&sent)
+	w := newPLITestSession(&sent)
 
 	const callCount = 10
 	for i := 0; i < callCount; i++ {
@@ -121,7 +121,7 @@ func TestSendPLINowBypassesRateLimit(t *testing.T) {
 
 func TestSendPLINowResetsTheRateLimitWindow(t *testing.T) {
 	sent := atomic.Int64{}
-	w := newTestWHEPSession(&sent)
+	w := newPLITestSession(&sent)
 
 	w.sendPLINow()
 	w.SendPLI()
@@ -133,7 +133,7 @@ func TestSendPLINowResetsTheRateLimitWindow(t *testing.T) {
 
 func TestSendPLIIsSkippedForClosedSessions(t *testing.T) {
 	sent := atomic.Int64{}
-	w := newTestWHEPSession(&sent)
+	w := newPLITestSession(&sent)
 	w.IsSessionClosed.Store(true)
 
 	w.SendPLI()

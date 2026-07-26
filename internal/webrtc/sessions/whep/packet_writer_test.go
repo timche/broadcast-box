@@ -72,7 +72,7 @@ func newBoundAudioTrack(t *testing.T) (*codecs.TrackMultiCodec, *countingWriteSt
 	return track, writeStream
 }
 
-func newTestWHEPSession(t *testing.T, audioTrack *codecs.TrackMultiCodec) *WHEPSession {
+func newAudioTestSession(t *testing.T, audioTrack *codecs.TrackMultiCodec) *WHEPSession {
 	t.Helper()
 
 	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{})
@@ -99,7 +99,7 @@ func newAudioPacket(sequenceNumber uint16) codecs.TrackPacket {
 
 func TestSendAudioPacketCountsConcurrentSenders(t *testing.T) {
 	track, writeStream := newBoundAudioTrack(t)
-	session := newTestWHEPSession(t, track)
+	session := newAudioTestSession(t, track)
 
 	const senders = 8
 	const packetsPerSender = 500
@@ -144,7 +144,7 @@ func TestSendAudioPacketCountsConcurrentSenders(t *testing.T) {
 
 func TestSendAudioPacketAfterTrackClearedDoesNotWrite(t *testing.T) {
 	track, writeStream := newBoundAudioTrack(t)
-	session := newTestWHEPSession(t, track)
+	session := newAudioTestSession(t, track)
 
 	session.SendAudioPacket(newAudioPacket(1))
 	if writes := writeStream.writes.Load(); writes != 1 {
@@ -165,7 +165,7 @@ func TestSendAudioPacketAfterTrackClearedDoesNotWrite(t *testing.T) {
 
 func TestSendAudioPacketConcurrentWithCloseDoesNotPanic(t *testing.T) {
 	track, _ := newBoundAudioTrack(t)
-	session := newTestWHEPSession(t, track)
+	session := newAudioTestSession(t, track)
 
 	var waitGroup sync.WaitGroup
 	start := make(chan struct{})
