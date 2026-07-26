@@ -2,6 +2,7 @@ package codecs
 
 import (
 	"log/slog"
+	"sync/atomic"
 
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4"
@@ -17,12 +18,15 @@ type TrackPacket struct {
 }
 
 type TrackMultiCodec struct {
-	id         string
-	rid        string
-	streamID   string
-	kind       webrtc.RTPCodecType
-	codec      TrackCodeType
-	errorCount int
+	id       string
+	rid      string
+	streamID string
+	kind     webrtc.RTPCodecType
+	codec    TrackCodeType
+
+	// During a simulcast layer switch a track can briefly be written by the
+	// videoWriter goroutines of two different layers, so this is atomic.
+	errorCount atomic.Uint64
 
 	ssrc        webrtc.SSRC
 	writeStream webrtc.TrackLocalWriter
@@ -151,12 +155,18 @@ func (t *TrackMultiCodec) WriteRTP(packet *rtp.Packet, codec TrackCodeType) erro
 	packet.PayloadType = t.currentPayloadType
 
 	if _, err := t.writeStream.WriteRTP(&packet.Header, packet.Payload); err != nil {
-		t.errorCount += 1
+		errorCount := t.errorCount.Add(1)
 
-		if t.errorCount%50 == 0 {
-			slog.Error("WHIPSession.TrackMultiCodec.WriteRTP.Error", "errorCount", t.errorCount, "err", err)
-			return err
+		// A broken track fails on every packet, so the log is sampled to avoid
+		// emitting thousands of identical lines a second. The error itself is
+		// always returned: the caller uses io.ErrClosedPipe to notice that a
+		// viewer has gone away, and swallowing it delayed that by up to 50
+		// packets while writes continued to a dead connection.
+		if errorCount%50 == 1 {
+			slog.Error("WHIPSession.TrackMultiCodec.WriteRTP.Error", "errorCount", errorCount, "err", err)
 		}
+
+		return err
 	}
 
 	return nil
