@@ -24,9 +24,7 @@ func CreateNewWHEP(
 	w = &WHEPSession{
 		SessionID:               whepSessionID,
 		StreamKey:               streamKey,
-		AudioTrack:              audioTrack,
 		VideoTrack:              videoTrack,
-		AudioTimestamp:          5000,
 		VideoTimestamp:          5000,
 		PeerConnection:          peerConnection,
 		pliSender:               pliSender,
@@ -34,6 +32,7 @@ func CreateNewWHEP(
 		ChatManager:             chatManager,
 	}
 
+	w.AudioTrack.Store(audioTrack)
 	w.AudioLayerCurrent.Store("")
 	w.VideoLayerCurrent.Store("")
 	w.IsWaitingForKeyframe.Store(true)
@@ -57,14 +56,11 @@ func (w *WHEPSession) Close() {
 		slog.Debug("WHEPSession.Close.PeerConnection.GracefulClose.Completed")
 
 		// Empty tracks
-		w.AudioLock.Lock()
+		w.AudioTrack.Store(nil)
+
 		w.VideoLock.Lock()
-
-		w.AudioTrack = nil
 		w.VideoTrack = nil
-
 		w.VideoLock.Unlock()
-		w.AudioLock.Unlock()
 
 		if w.onClose != nil {
 			w.onClose(w.SessionID)
@@ -95,7 +91,8 @@ func (w *WHEPSession) SetOnClose(onClose func(string)) {
 
 // Get the current status of the WHEP session
 func (w *WHEPSession) GetWHEPSessionStatus() (state SessionState) {
-	w.AudioLock.RLock()
+	audioPacketsWritten := w.AudioPacketsWritten.Load()
+
 	w.VideoLock.Lock()
 	w.updateVideoBitrateLocked(time.Now())
 
@@ -106,9 +103,9 @@ func (w *WHEPSession) GetWHEPSessionStatus() (state SessionState) {
 		ID: w.SessionID,
 
 		AudioLayerCurrent:   currentAudioLayer,
-		AudioTimestamp:      w.AudioTimestamp,
-		AudioPacketsWritten: w.AudioPacketsWritten,
-		AudioSequenceNumber: uint64(w.AudioSequenceNumber),
+		AudioTimestamp:      audioTimestampReported,
+		AudioPacketsWritten: audioPacketsWritten,
+		AudioSequenceNumber: audioSequenceNumberReported,
 
 		VideoLayerCurrent:   currentVideoLayer,
 		VideoTimestamp:      w.VideoTimestamp,
@@ -119,7 +116,6 @@ func (w *WHEPSession) GetWHEPSessionStatus() (state SessionState) {
 	}
 
 	w.VideoLock.Unlock()
-	w.AudioLock.RUnlock()
 
 	return
 }
