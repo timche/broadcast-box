@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { useIsPortrait } from "@/hooks/use-is-portrait";
 import type { StreamStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { addWatchedStream } from "@/lib/watched";
@@ -44,11 +45,14 @@ function buildGroups(streamKeys: string[]): string[][] {
 
 export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   const navigate = useNavigate();
+  const isPortrait = useIsPortrait();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newStreamName, setNewStreamName] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
   const [streamHidden, setStreamHidden] = useState(false);
-  const [tileLayout, setTileLayout] = useState<TileLayout>("horizontal");
+  // Null until the viewer picks a layout, so rotating the device keeps
+  // following the orientation default.
+  const [tileLayoutOverride, setTileLayoutOverride] = useState<TileLayout | null>(null);
   const [chatChannels, setChatChannels] = useState<Record<string, ChatConnection | null>>({});
 
   const [collapsedChats, setCollapsedChats] = useState<Record<string, boolean>>({});
@@ -94,6 +98,9 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   };
 
   const isSingle = streamKeys.length === 1;
+  // A portrait viewport has no width to spare, so streams stack by default
+  // there and sit side by side in landscape.
+  const tileLayout = tileLayoutOverride ?? (isPortrait ? "vertical" : "horizontal");
   const isHorizontal = tileLayout === "horizontal";
   const groups = buildGroups(streamKeys);
   // Hiding the stream keeps chat visible (and expanded) but drops the video.
@@ -103,15 +110,20 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
     <div className="w-full bg-black" style={{ height: `calc(100dvh - ${HEADER_HEIGHT})` }}>
       <HeaderPortal>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="secondary" onClick={() => setIsAddOpen(true)}>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setIsAddOpen(true)}
+            aria-label="Add stream"
+          >
             <Plus className="size-4" />
-            Add stream
+            <span className="hidden sm:inline">Add stream</span>
           </Button>
           {!isSingle && (
             <Button
               size="sm"
               variant="secondary"
-              onClick={() => setTileLayout(isHorizontal ? "vertical" : "horizontal")}
+              onClick={() => setTileLayoutOverride(isHorizontal ? "vertical" : "horizontal")}
               aria-label={isHorizontal ? "Stack streams" : "Place streams side by side"}
               title="Flip the direction the streams are tiled in"
             >
