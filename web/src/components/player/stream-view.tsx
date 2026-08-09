@@ -234,15 +234,13 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
 
         {showChat &&
           isNarrow && (
-            // Narrow viewports have no room for the video and a column of chats,
-            // so one chat floats over the video and the tabs switch between them.
+            // Narrow viewports have no room for the video and a column of
+            // chats, so one chat covers everything below the header and the
+            // tabs switch between them.
             <Tabs
               value={activeChatKey}
               onValueChange={(value) => setSelectedChatKey(String(value))}
-              className={cn(
-                "bg-background/95 absolute inset-x-0 bottom-0 z-30 flex flex-col gap-0 border-t backdrop-blur",
-                streamHidden ? "top-0" : "h-1/2",
-              )}
+              className="bg-background/95 absolute inset-0 z-30 flex flex-col gap-0 backdrop-blur"
             >
               {!isSingle && (
                 <TabsList
