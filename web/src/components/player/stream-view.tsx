@@ -16,8 +16,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useChatMessageAlert } from "@/hooks/use-chat-message-alert";
 import { useIsPortrait } from "@/hooks/use-is-portrait";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { useViewerAlert } from "@/hooks/use-viewer-alert";
 import { getDisplayName } from "@/lib/display-name";
 import type { StreamStatus } from "@/lib/types";
@@ -26,6 +28,9 @@ import { addWatchedStream } from "@/lib/watched";
 import type { ChatConnection } from "@/lib/webrtc/chat";
 
 const HEADER_HEIGHT = "2.75rem";
+
+/** Below Tailwind's `md` breakpoint the chat sidebar no longer fits. */
+const NARROW_VIEWPORT_QUERY = "(max-width: 767px)";
 
 /**
  * Which way the streams flow before wrapping: "horizontal" fills a row first
@@ -50,6 +55,7 @@ function buildGroups(streamKeys: string[]): string[][] {
 export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   const navigate = useNavigate();
   const isPortrait = useIsPortrait();
+  const isNarrow = useMediaQuery(NARROW_VIEWPORT_QUERY);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newStreamName, setNewStreamName] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
@@ -61,6 +67,7 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
 
   const [collapsedChats, setCollapsedChats] = useState<Record<string, boolean>>({});
   const [viewerCounts, setViewerCounts] = useState<Record<string, number>>({});
+  const [selectedChatKey, setSelectedChatKey] = useState<string | null>(null);
 
   const setChatChannelFor = useCallback((streamKey: string, channel: ChatConnection | null) => {
     setChatChannels((current) => ({ ...current, [streamKey]: channel }));
@@ -116,9 +123,14 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   const groups = buildGroups(streamKeys);
   // Hiding the stream keeps chat visible (and expanded) but drops the video.
   const showChat = chatOpen || streamHidden;
+  // Falls back to the first stream when the selected one has been removed.
+  const activeChatKey =
+    selectedChatKey !== null && streamKeys.includes(selectedChatKey)
+      ? selectedChatKey
+      : streamKeys[0];
 
   return (
-    <div className="w-full bg-black" style={{ height: `calc(100dvh - ${HEADER_HEIGHT})` }}>
+    <div className="relative w-full bg-black" style={{ height: `calc(100dvh - ${HEADER_HEIGHT})` }}>
       <HeaderPortal>
         <div className="flex items-center gap-2">
           <Button
@@ -220,11 +232,53 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
           )}
         </div>
 
-        {showChat && (
+        {showChat &&
+          isNarrow && (
+            // Narrow viewports have no room for the video and a column of chats,
+            // so one chat floats over the video and the tabs switch between them.
+            <Tabs
+              value={activeChatKey}
+              onValueChange={(value) => setSelectedChatKey(String(value))}
+              className={cn(
+                "bg-background/95 absolute inset-x-0 bottom-0 z-30 flex flex-col gap-0 border-t backdrop-blur",
+                streamHidden ? "top-0" : "h-1/2",
+              )}
+            >
+              {!isSingle && (
+                <TabsList
+                  variant="line"
+                  className="w-full shrink-0 justify-start overflow-x-auto border-b px-2"
+                >
+                  {streamKeys.map((streamKey) => (
+                    <TabsTrigger key={streamKey} value={streamKey} className="shrink-0">
+                      {streamKey}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              )}
+              {streamKeys.map((streamKey) => (
+                // Kept mounted so switching tabs doesn't discard a half-typed
+                // message.
+                <TabsContent
+                  key={streamKey}
+                  value={streamKey}
+                  keepMounted
+                  className="min-h-0 flex-1"
+                >
+                  <Chat
+                    channel={chatChannels[streamKey] ?? null}
+                    viewers={viewerCounts[streamKey] ?? 0}
+                  />
+                </TabsContent>
+              ))}
+            </Tabs>
+          )}
+
+        {showChat && !isNarrow && (
           <aside
             className={cn(
-              "flex min-h-0 flex-1 flex-col overflow-y-auto",
-              !streamHidden && "border-t md:w-80 md:flex-none md:border-t-0 md:border-l",
+              "flex min-h-0 flex-col overflow-y-auto",
+              streamHidden ? "flex-1" : "w-80 shrink-0 border-l",
             )}
           >
             {streamKeys.map((streamKey) => {

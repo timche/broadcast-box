@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 const PORTRAIT_QUERY = "(orientation: portrait)";
 
@@ -6,18 +6,6 @@ const PORTRAIT_QUERY = "(orientation: portrait)";
  * Tracks whether the viewport is taller than it is wide — true on a phone held
  * upright, and on narrow desktop windows.
  */
-export function useIsPortrait() {
-  const [isPortrait, setIsPortrait] = useState(() => window.matchMedia(PORTRAIT_QUERY).matches);
-
-  useEffect(() => {
-    const portrait = window.matchMedia(PORTRAIT_QUERY);
-    const handleChange = (event: MediaQueryListEvent) => setIsPortrait(event.matches);
-
-    setIsPortrait(portrait.matches);
-    portrait.addEventListener("change", handleChange);
-
-    return () => portrait.removeEventListener("change", handleChange);
-  }, []);
-
-  return isPortrait;
+export function useIsPortrait(): boolean {
+  return useMediaQuery(PORTRAIT_QUERY);
 }
