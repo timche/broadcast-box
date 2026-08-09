@@ -6,7 +6,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import dotenv from "dotenv";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 
 const rootDir = fileURLToPath(new URL(".", import.meta.url));
 
@@ -39,8 +39,69 @@ if (process.env.USE_SSL === "TRUE") {
 
 console.log(`Target Backend: ${targetProtocol}${targetHostAddress}`);
 
+// Named `.json` rather than `.webmanifest`: the Go server types static files
+// from the extension, and only the former is guaranteed to come back as JSON.
+const MANIFEST_FILE = "manifest.json";
+/** Matches the icon background, so the splash screen doesn't flash. */
+const BRAND_COLOR = "#111214";
+
+/**
+ * Emits the web app manifest. It is generated rather than checked in because
+ * the installed app's name has to follow `VITE_SITE_NAME`, same as the header
+ * and the document title.
+ */
+function webAppManifest(): Plugin {
+  const siteName = process.env.VITE_SITE_NAME?.trim() || "Broadcast Box";
+  const manifest = JSON.stringify(
+    {
+      name: siteName,
+      short_name: siteName,
+      description: "Watch and broadcast low-latency WebRTC streams.",
+      start_url: "/",
+      scope: "/",
+      display: "standalone",
+      background_color: BRAND_COLOR,
+      theme_color: BRAND_COLOR,
+      icons: [
+        { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+        { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+        {
+          src: "/icon-maskable-512.png",
+          sizes: "512x512",
+          type: "image/png",
+          purpose: "maskable",
+        },
+      ],
+    },
+    null,
+    2,
+  );
+
+  return {
+    name: "broadcast-box:web-app-manifest",
+    configureServer(server) {
+      server.middlewares.use((request, response, next) => {
+        if (request.url?.split("?")[0] !== `/${MANIFEST_FILE}`) {
+          next();
+          return;
+        }
+        response.setHeader("Content-Type", "application/manifest+json");
+        response.end(manifest);
+      });
+    },
+    generateBundle() {
+      this.emitFile({ type: "asset", fileName: MANIFEST_FILE, source: manifest });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [tanstackRouter({ target: "react", autoCodeSplitting: true }), react(), tailwindcss()],
+  plugins: [
+    tanstackRouter({ target: "react", autoCodeSplitting: true }),
+    react(),
+    tailwindcss(),
+    webAppManifest(),
+  ],
   resolve: {
     alias: {
       "@": path.resolve(rootDir, "src"),

@@ -9,6 +9,15 @@ import "./styles.css";
 
 document.title = SITE_NAME;
 
+// Registered only in a real build: the worker lives in `public/`, so the dev
+// server has no `/sw.js` to serve. Failing to register just means no install
+// prompt, which is not worth surfacing.
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
+  });
+}
+
 const router = createRouter({
   routeTree,
   defaultPreload: "intent",
