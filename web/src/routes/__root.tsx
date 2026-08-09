@@ -15,7 +15,12 @@ function RootLayout() {
     // when a route already fills it exactly.
     <div className="flex min-h-dvh flex-col">
       <header className="bg-card/80 fixed inset-x-0 top-0 z-40 flex h-11 items-center gap-2 border-b px-3 backdrop-blur">
-        <Link to="/" className="shrink-0 text-sm font-semibold tracking-tight">
+        <Link
+          to="/"
+          className="flex shrink-0 items-center gap-2 text-sm font-semibold tracking-tight"
+        >
+          {/* Decorative: the site name sits right beside it. */}
+          <img src="/icon-64.png" alt="" className="size-6 rounded-md" />
           {SITE_NAME}
         </Link>
         <div id={HEADER_ACTIONS_ID} className="ml-auto flex min-w-0 items-center gap-2" />

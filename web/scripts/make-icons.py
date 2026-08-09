@@ -14,8 +14,9 @@ import zlib
 
 SOURCE = "scripts/icon-source.png"
 
-# 32 for the favicon, 180 for iOS home screens, 192 and 512 for the manifest.
-SIZES = (32, 180, 192, 512)
+# 32 for the favicon, 64 for the header mark, 180 for iOS home screens,
+# 192 and 512 for the manifest.
+SIZES = (32, 64, 180, 192, 512)
 
 # Android masks a maskable icon to an arbitrary shape and only guarantees the
 # centre 80%. The artwork is full-bleed, so it is inset onto a matching
