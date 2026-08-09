@@ -18,6 +18,10 @@ SOURCE = "scripts/icon-source.png"
 # 192 and 512 for the manifest.
 SIZES = (32, 64, 180, 192, 512)
 
+# Only the favicon is rounded, as a fraction of its size. Home screen and
+# launcher icons are shaped by the platform, so they stay square.
+FAVICON_RADIUS = 0.22
+
 
 def decode_png(path):
     """Decode an 8-bit non-interlaced RGB/RGBA PNG into (width, height, RGBA)."""
@@ -128,6 +132,34 @@ def resize(pixels, width, height, target):
     return out
 
 
+def round_corners(pixels, size, radius_fraction):
+    """Clip to a rounded square by way of the alpha channel, supersampling the
+    corners so the curve doesn't come out jagged at 32px."""
+    radius = size * radius_fraction
+    samples = 4
+    total = samples * samples
+
+    out = bytearray(pixels)
+    for y in range(size):
+        for x in range(size):
+            covered = 0
+            for sy in range(samples):
+                for sx in range(samples):
+                    px = x + (sx + 0.5) / samples
+                    py = y + (sy + 0.5) / samples
+                    # Nearest point on the rounded square's inner rectangle.
+                    cx = min(max(px, radius), size - radius)
+                    cy = min(max(py, radius), size - radius)
+                    if (px - cx) ** 2 + (py - cy) ** 2 <= radius**2:
+                        covered += 1
+
+            if covered == total:
+                continue
+            alpha = (y * size + x) * 4 + 3
+            out[alpha] = out[alpha] * covered // total
+    return out
+
+
 def encode_png(pixels, size):
     stride = size * 4
     raw = bytearray()
@@ -172,6 +204,9 @@ if width != height:
 
 for size in SIZES:
     scaled = source if size == width else resize(source, width, height, size)
+    if size == 32:
+        scaled = round_corners(scaled, size, FAVICON_RADIUS)
+
     write(f"public/icon-{size}.png", encode_png(scaled, size))
     if size == 32:
         write_ico("public/favicon.ico", encode_png(scaled, size))
