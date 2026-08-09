@@ -3,6 +3,7 @@ import { Columns2, MessageSquare, Plus, Rows2, Video, VideoOff, X } from "lucide
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { Chat } from "@/components/chat/chat";
 import { HeaderPortal } from "@/components/layout/header-portal";
+import { SettingsButton } from "@/components/layout/settings-button";
 import { Player } from "@/components/player/player";
 import { PreviouslyWatched } from "@/components/previously-watched";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,10 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { useChatMessageAlert } from "@/hooks/use-chat-message-alert";
 import { useIsPortrait } from "@/hooks/use-is-portrait";
+import { useViewerAlert } from "@/hooks/use-viewer-alert";
+import { getDisplayName } from "@/lib/display-name";
 import type { StreamStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { addWatchedStream } from "@/lib/watched";
@@ -62,12 +66,19 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
     setChatChannels((current) => ({ ...current, [streamKey]: channel }));
   }, []);
 
-  const handleStreamStatus = useCallback((streamKey: string, status: StreamStatus) => {
-    setViewerCounts((current) => ({
-      ...current,
-      [streamKey]: status.isOnline ? status.viewers : 0,
-    }));
-  }, []);
+  const reportViewerCount = useViewerAlert();
+  useChatMessageAlert(chatChannels, getDisplayName);
+
+  const handleStreamStatus = useCallback(
+    (streamKey: string, status: StreamStatus) => {
+      setViewerCounts((current) => ({
+        ...current,
+        [streamKey]: status.isOnline ? status.viewers : 0,
+      }));
+      reportViewerCount(streamKey, status.isOnline ? status.viewers : null);
+    },
+    [reportViewerCount],
+  );
 
   // Remember every stream watched (used for "Previously watched").
   useEffect(() => {
@@ -150,6 +161,7 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
             <MessageSquare className="size-4" />
             <span className="hidden sm:inline">{chatOpen ? "Hide chat" : "Show chat"}</span>
           </Button>
+          <SettingsButton />
         </div>
       </HeaderPortal>
 

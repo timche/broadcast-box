@@ -70,6 +70,7 @@ export class ChatConnection {
   readonly channel: RTCDataChannel;
   private snapshot: ChatSnapshot = { messages: [], status: "connecting" };
   private readonly listeners = new Set<() => void>();
+  private readonly liveMessageListeners = new Set<(message: ChatMessage) => void>();
 
   constructor(peerConnection: RTCPeerConnection) {
     this.channel = peerConnection.createDataChannel(CHAT_DATA_CHANNEL_LABEL);
@@ -84,6 +85,16 @@ export class ChatConnection {
   subscribe = (onChange: () => void): (() => void) => {
     this.listeners.add(onChange);
     return () => this.listeners.delete(onChange);
+  };
+
+  /**
+   * Subscribes to messages relayed while connected. The backlog replayed on
+   * join is deliberately excluded — only what arrives afterwards is announced,
+   * so notifications don't fire for a conversation that already happened.
+   */
+  subscribeToLiveMessages = (listener: (message: ChatMessage) => void): (() => void) => {
+    this.liveMessageListeners.add(listener);
+    return () => this.liveMessageListeners.delete(listener);
   };
 
   send(text: string, displayName: string): boolean {
@@ -125,15 +136,18 @@ export class ChatConnection {
     }
   }
 
-  private append(message: ChatMessage): void {
+  /** Returns false when the message was a duplicate and got dropped. */
+  private append(message: ChatMessage): boolean {
     if (this.snapshot.messages.some((existing) => existing.id === message.id)) {
-      return;
+      return false;
     }
     const messages = [...this.snapshot.messages, message];
     this.emit({
       messages:
         messages.length > MAX_MESSAGES ? messages.slice(messages.length - MAX_MESSAGES) : messages,
     });
+
+    return true;
   }
 
   private handleOpen = (): void => {
@@ -164,7 +178,9 @@ export class ChatConnection {
         payload.events.forEach((entry) => this.append(entry.message));
         break;
       case "chat.message":
-        this.append(payload.message);
+        if (this.append(payload.message)) {
+          this.liveMessageListeners.forEach((listener) => listener(payload.message));
+        }
         break;
       case "chat.error":
         this.setStatus("error");

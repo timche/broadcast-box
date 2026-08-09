@@ -1,8 +1,9 @@
 import { useNavigate } from "@tanstack/react-router";
 import { Check, Copy, Eye, EyeOff, MessageSquare, MonitorUp, Webcam } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chat } from "@/components/chat/chat";
 import { HeaderPortal } from "@/components/layout/header-portal";
+import { SettingsButton } from "@/components/layout/settings-button";
 import { Button } from "@/components/ui/button";
 import {
   InputGroup,
@@ -11,6 +12,8 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { toast } from "@/components/ui/toast";
+import { useChatMessageAlert } from "@/hooks/use-chat-message-alert";
+import { useViewerAlert } from "@/hooks/use-viewer-alert";
 import type { StreamStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { type ChatConnection, createChatConnection } from "@/lib/webrtc/chat";
@@ -72,6 +75,13 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
   const [copied, setCopied] = useState(false);
   const [chatChannel, setChatChannel] = useState<ChatConnection | null>(null);
   const [chatOpen, setChatOpen] = useState(true);
+
+  const reportViewerCount = useViewerAlert();
+  const chatChannels = useMemo(() => ({ [streamKey]: chatChannel }), [streamKey, chatChannel]);
+  // The broadcaster posts under the stream name (see the Chat `fixedName`).
+  const getLocalDisplayName = useCallback(() => streamKey, [streamKey]);
+
+  useChatMessageAlert(chatChannels, getLocalDisplayName);
 
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
@@ -205,6 +215,7 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
               const status = JSON.parse(event.data) as StreamStatus;
               setIsOnline(status.isOnline);
               setViewers(status.viewers);
+              reportViewerCount(streamKey, status.isOnline ? status.viewers : null);
             });
           }
         } catch {
@@ -220,7 +231,7 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
     return () => {
       cancelled = true;
     };
-  }, [source, requestCount, streamKey, stopStream]);
+  }, [source, requestCount, streamKey, stopStream, reportViewerCount]);
 
   // Signal-quality / packet-loss monitor.
   useEffect(() => {
@@ -283,6 +294,7 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
             <MessageSquare className="size-4" />
             <span className="hidden sm:inline">{chatOpen ? "Hide chat" : "Show chat"}</span>
           </Button>
+          <SettingsButton />
         </div>
       </HeaderPortal>
 
