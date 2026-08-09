@@ -158,10 +158,14 @@ export function Chat({
             {viewers}
           </span>
         )}
-        <span className="flex items-center gap-1.5">
-          <span className={cn("size-2 rounded-full", statusColor)} />
-          {STATUS_LABEL[status]}
-        </span>
+        {/* The dot alone carries the connection state; the label lives in its
+            tooltip and for screen readers. */}
+        <span
+          role="status"
+          aria-label={`Chat ${STATUS_LABEL[status].toLowerCase()}`}
+          title={STATUS_LABEL[status]}
+          className={cn("size-2 rounded-full", statusColor)}
+        />
       </span>
     </>
   );
