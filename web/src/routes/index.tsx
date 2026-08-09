@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/input-group";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/toast";
+import { useIsNarrowViewport } from "@/hooks/use-is-narrow-viewport";
 import { useStreamOnline } from "@/hooks/use-stream-online";
 import { getLastStreamName, setLastStreamName } from "@/lib/last-stream";
 import { cn } from "@/lib/utils";
@@ -32,7 +33,12 @@ export const Route = createFileRoute("/")({
 
 function Home() {
   const navigate = useNavigate();
-  const { tab = "watch" } = Route.useSearch();
+  const isNarrow = useIsNarrowViewport();
+  const { tab: requestedTab = "watch" } = Route.useSearch();
+  // Neither way of publishing is much use from a phone — a browser capture
+  // needs a desktop's screen or HTTPS for the camera, and OBS isn't there —
+  // so the narrow layout drops both tabs and just watches.
+  const tab = isNarrow ? "watch" : requestedTab;
   // The Stream and OBS tabs both revolve around a stream name; only Watch starts blank.
   const [streamName, setStreamName] = useState(() => (tab === "watch" ? "" : getLastStreamName()));
 
@@ -69,7 +75,7 @@ function Home() {
     <div className="mx-auto max-w-3xl px-4 pt-12">
       <Card className="py-8">
         <CardContent className="flex flex-col gap-4">
-          <div className="grid grid-cols-3 gap-2 rounded-lg border p-1">
+          <div className={cn("grid grid-cols-3 gap-2 rounded-lg border p-1", isNarrow && "hidden")}>
             <Button
               variant={tab === "watch" ? "default" : "ghost"}
               onClick={() => selectTab("watch")}

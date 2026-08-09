@@ -18,10 +18,10 @@ import { Input } from "@/components/ui/input";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useChatMessageAlert } from "@/hooks/use-chat-message-alert";
+import { useIsNarrowViewport } from "@/hooks/use-is-narrow-viewport";
 import { useIsPortrait } from "@/hooks/use-is-portrait";
 import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 import { useLiveChatMessages } from "@/hooks/use-live-chat-messages";
-import { useMediaQuery } from "@/hooks/use-media-query";
 import { useViewerAlert } from "@/hooks/use-viewer-alert";
 import { getDisplayName } from "@/lib/display-name";
 import type { StreamStatus } from "@/lib/types";
@@ -30,9 +30,6 @@ import { addWatchedStream } from "@/lib/watched";
 import type { ChatConnection } from "@/lib/webrtc/chat";
 
 const HEADER_HEIGHT = "2.75rem";
-
-/** Below Tailwind's `md` breakpoint the chat sidebar no longer fits. */
-const NARROW_VIEWPORT_QUERY = "(max-width: 767px)";
 
 /**
  * Which way the streams flow before wrapping: "horizontal" fills a row first
@@ -57,7 +54,7 @@ function buildGroups(streamKeys: string[]): string[][] {
 export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   const navigate = useNavigate();
   const isPortrait = useIsPortrait();
-  const isNarrow = useMediaQuery(NARROW_VIEWPORT_QUERY);
+  const isNarrow = useIsNarrowViewport();
   const keyboardInset = useKeyboardInset();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newStreamName, setNewStreamName] = useState("");
