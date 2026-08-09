@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Columns2, MessageSquare, Plus, Rows2, Video, VideoOff, X } from "lucide-react";
+import { Columns2, Eye, MessageSquare, Plus, Rows2, Video, VideoOff, X } from "lucide-react";
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { Chat } from "@/components/chat/chat";
 import { HeaderPortal } from "@/components/layout/header-portal";
@@ -19,6 +19,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useChatMessageAlert } from "@/hooks/use-chat-message-alert";
 import { useIsPortrait } from "@/hooks/use-is-portrait";
+import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useViewerAlert } from "@/hooks/use-viewer-alert";
 import { getDisplayName } from "@/lib/display-name";
@@ -56,6 +57,7 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   const navigate = useNavigate();
   const isPortrait = useIsPortrait();
   const isNarrow = useMediaQuery(NARROW_VIEWPORT_QUERY);
+  const keyboardInset = useKeyboardInset();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newStreamName, setNewStreamName] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
@@ -204,14 +206,23 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
                             <div className="flex h-full flex-col overflow-hidden bg-black">
                               <div className="flex h-6 shrink-0 items-center justify-between gap-2 bg-neutral-900 px-2 text-xs text-white">
                                 <span className="truncate">{streamKey}</span>
-                                <button
-                                  type="button"
-                                  className="rounded p-0.5 hover:bg-white/10"
-                                  aria-label={`Remove ${streamKey}`}
-                                  onClick={() => removeStream(streamKey)}
-                                >
-                                  <X className="size-3.5" />
-                                </button>
+                                <span className="flex shrink-0 items-center gap-1">
+                                  <span
+                                    className="flex items-center gap-1 tabular-nums"
+                                    title={`${viewerCounts[streamKey] ?? 0} watching`}
+                                  >
+                                    <Eye className="size-3.5" />
+                                    {viewerCounts[streamKey] ?? 0}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    className="rounded p-0.5 hover:bg-white/10"
+                                    aria-label={`Remove ${streamKey}`}
+                                    onClick={() => removeStream(streamKey)}
+                                  >
+                                    <X className="size-3.5" />
+                                  </button>
+                                </span>
                               </div>
                               <div className="relative min-h-0 flex-1">
                                 <Player
@@ -241,6 +252,7 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
               value={activeChatKey}
               onValueChange={(value) => setSelectedChatKey(String(value))}
               className="bg-background/95 absolute inset-0 z-30 flex flex-col gap-0 backdrop-blur"
+              style={{ bottom: keyboardInset }}
             >
               {!isSingle && (
                 <TabsList
