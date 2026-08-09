@@ -19,10 +19,15 @@ const DURATION_S = 0.13;
 const PEAK_GAIN = 0.05;
 /** Events arrive in bursts; collapse those into a single blip. */
 const MIN_GAP_MS = 300;
+/** Interactions that count as the gesture browsers wait for before allowing audio. */
+const UNLOCK_GESTURES = ["pointerup", "keydown"] as const;
+
+/** `navigator.audioSession` is iOS 17+ and not in the DOM types yet. */
+type NavigatorWithAudioSession = Navigator & { audioSession?: { type: string } };
 
 let audioContext: AudioContext | null = null;
 let lastPlayedAt = Number.NEGATIVE_INFINITY;
-let unlocking = false;
+let playbackSessionClaimed = false;
 
 function getAudioContext(): AudioContext | null {
   if (audioContext !== null) {
@@ -37,7 +42,32 @@ function getAudioContext(): AudioContext | null {
   return audioContext;
 }
 
+/**
+ * iOS plays Web Audio through the "ambient" audio session, which the ringer
+ * switch silences — so a phone on silent hears nothing however loud the blip
+ * is. Claiming the "playback" session opts out of that switch.
+ *
+ * It is claimed on the first blip rather than up front because the session is
+ * exclusive: a viewer with both alerts off should never have whatever they are
+ * listening to interrupted by a page that is not going to make a sound.
+ */
+function claimPlaybackAudioSession(): void {
+  if (playbackSessionClaimed) {
+    return;
+  }
+
+  const { audioSession } = navigator as NavigatorWithAudioSession;
+  if (audioSession === undefined) {
+    return;
+  }
+
+  audioSession.type = "playback";
+  playbackSessionClaimed = true;
+}
+
 function scheduleBlip(context: AudioContext, sound: AlertSound): void {
+  claimPlaybackAudioSession();
+
   const startedAt = context.currentTime;
   const oscillator = context.createOscillator();
   const envelope = context.createGain();
@@ -56,33 +86,32 @@ function scheduleBlip(context: AudioContext, sound: AlertSound): void {
 }
 
 /**
- * Browsers keep an audio context locked until the page has been interacted
- * with, and a locked context fires everything queued against it the moment it
- * unlocks. So a blip that arrives early waits for the context and then plays,
- * and only one is ever in flight — the rest are dropped rather than piling up
- * into a burst of stale alerts.
+ * Browsers keep an audio context suspended until the page has been interacted
+ * with, and iOS only honours a resume made from inside the gesture itself —
+ * one asked for at any other moment is left hanging forever. So every gesture
+ * on the page is taken as a chance to get the context back to running, which
+ * also covers iOS re-suspending it whenever the page is backgrounded.
  */
-function playWhenUnlocked(context: AudioContext, sound: AlertSound): void {
-  if (unlocking) {
+function unlockOnGesture(): void {
+  const context = getAudioContext();
+  if (context === null || context.state === "running") {
     return;
   }
-  unlocking = true;
 
-  context.resume().then(
-    () => {
-      unlocking = false;
-      scheduleBlip(context, sound);
-    },
-    () => {
-      unlocking = false;
-    },
-  );
+  context.resume().catch(() => undefined);
 }
 
-/** Plays a blip, unless one just played or the context is still locked. */
+for (const gesture of UNLOCK_GESTURES) {
+  window.addEventListener(gesture, unlockOnGesture, { passive: true });
+}
+
+/** Plays a blip, unless one just played or audio is still locked. */
 export function playAlertSound(sound: AlertSound): void {
   const context = getAudioContext();
-  if (context === null) {
+  // Locked, or interrupted by iOS. The next gesture unlocks it; this alert is
+  // dropped rather than held back, since a blip for an event that has scrolled
+  // out of view is worse than no blip at all.
+  if (context === null || context.state !== "running") {
     return;
   }
 
@@ -92,12 +121,7 @@ export function playAlertSound(sound: AlertSound): void {
   }
   lastPlayedAt = playedAt;
 
-  if (context.state === "running") {
-    scheduleBlip(context, sound);
-    return;
-  }
-
-  playWhenUnlocked(context, sound);
+  scheduleBlip(context, sound);
 }
 
 /**
@@ -118,5 +142,10 @@ export function previewAlertSound(sound: AlertSound): void {
     return;
   }
 
-  playWhenUnlocked(context, sound);
+  // Called straight out of the click, which is the one moment iOS lets a
+  // suspended context start, so the preview is what unlocks every later blip.
+  context.resume().then(
+    () => scheduleBlip(context, sound),
+    () => undefined,
+  );
 }
