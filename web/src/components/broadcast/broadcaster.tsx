@@ -289,10 +289,10 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
             variant={chatOpen ? "default" : "secondary"}
             onClick={() => setChatOpen((open) => !open)}
             aria-label={chatOpen ? "Hide chat" : "Show chat"}
+            title={chatOpen ? "Hide chat" : "Show chat"}
             className="shrink-0"
           >
             <MessageSquare className="size-4" />
-            <span className="hidden sm:inline">{chatOpen ? "Hide chat" : "Show chat"}</span>
           </Button>
           <SettingsButton />
         </div>

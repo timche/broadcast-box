@@ -152,9 +152,9 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
             variant="secondary"
             onClick={() => setIsAddOpen(true)}
             aria-label="Add stream"
+            title="Add stream"
           >
             <Plus className="size-4" />
-            <span className="hidden sm:inline">Add stream</span>
           </Button>
           {!isSingle && (
             <Button
@@ -165,7 +165,6 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
               title="Flip the direction the streams are tiled in"
             >
               {isHorizontal ? <Rows2 className="size-4" /> : <Columns2 className="size-4" />}
-              <span className="hidden sm:inline">{isHorizontal ? "Stack" : "Side by side"}</span>
             </Button>
           )}
           <Button
@@ -175,10 +174,10 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
             aria-label={
               hasUnreadChat ? "Show chat, new messages" : chatOpen ? "Hide chat" : "Show chat"
             }
+            title={chatOpen ? "Hide chat" : "Show chat"}
             className="relative"
           >
             <MessageSquare className="size-4" />
-            <span className="hidden sm:inline">{chatOpen ? "Hide chat" : "Show chat"}</span>
             {hasUnreadChat && (
               <span
                 aria-hidden
