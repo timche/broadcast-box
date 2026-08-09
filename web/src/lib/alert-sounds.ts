@@ -22,6 +22,7 @@ const MIN_GAP_MS = 300;
 
 let audioContext: AudioContext | null = null;
 let lastPlayedAt = Number.NEGATIVE_INFINITY;
+let unlocking = false;
 
 function getAudioContext(): AudioContext | null {
   if (audioContext !== null) {
@@ -36,33 +37,7 @@ function getAudioContext(): AudioContext | null {
   return audioContext;
 }
 
-/**
- * Plays a blip. Browsers only allow audio once the page has been interacted
- * with, so the first call should come from a user gesture (switching the
- * setting on) — that unlocks the context for the automatic ones that follow.
- */
-export function playAlertSound(sound: AlertSound): void {
-  const context = getAudioContext();
-  if (context === null) {
-    return;
-  }
-
-  const playedAt = performance.now();
-  if (playedAt - lastPlayedAt < MIN_GAP_MS) {
-    return;
-  }
-  lastPlayedAt = playedAt;
-
-  if (context.state !== "running") {
-    // Ask for the context back and drop this blip rather than scheduling it:
-    // a suspended context plays everything queued against it the moment it
-    // resumes, which would arrive as one burst of stale alerts.
-    context.resume().catch(() => {
-      // Still locked — the page has not been interacted with yet.
-    });
-    return;
-  }
-
+function scheduleBlip(context: AudioContext, sound: AlertSound): void {
   const startedAt = context.currentTime;
   const oscillator = context.createOscillator();
   const envelope = context.createGain();
@@ -81,9 +56,54 @@ export function playAlertSound(sound: AlertSound): void {
 }
 
 /**
- * Plays a preview from a user gesture, waiting for a locked audio context to
- * come back first so the very first preview is audible. Doing this once is
- * what lets the automatic alerts play unprompted afterwards.
+ * Browsers keep an audio context locked until the page has been interacted
+ * with, and a locked context fires everything queued against it the moment it
+ * unlocks. So a blip that arrives early waits for the context and then plays,
+ * and only one is ever in flight — the rest are dropped rather than piling up
+ * into a burst of stale alerts.
+ */
+function playWhenUnlocked(context: AudioContext, sound: AlertSound): void {
+  if (unlocking) {
+    return;
+  }
+  unlocking = true;
+
+  context.resume().then(
+    () => {
+      unlocking = false;
+      scheduleBlip(context, sound);
+    },
+    () => {
+      unlocking = false;
+    },
+  );
+}
+
+/** Plays a blip, unless one just played or the context is still locked. */
+export function playAlertSound(sound: AlertSound): void {
+  const context = getAudioContext();
+  if (context === null) {
+    return;
+  }
+
+  const playedAt = performance.now();
+  if (playedAt - lastPlayedAt < MIN_GAP_MS) {
+    return;
+  }
+  lastPlayedAt = playedAt;
+
+  if (context.state === "running") {
+    scheduleBlip(context, sound);
+    return;
+  }
+
+  playWhenUnlocked(context, sound);
+}
+
+/**
+ * Plays a preview from a user gesture — the click both unlocks audio and shows
+ * how loud the alert is. Skips the burst throttle so switching one setting on
+ * right after another still previews both.
  */
 export function previewAlertSound(sound: AlertSound): void {
   const context = getAudioContext();
@@ -91,15 +111,12 @@ export function previewAlertSound(sound: AlertSound): void {
     return;
   }
 
+  lastPlayedAt = performance.now();
+
   if (context.state === "running") {
-    playAlertSound(sound);
+    scheduleBlip(context, sound);
     return;
   }
 
-  context.resume().then(
-    () => playAlertSound(sound),
-    () => {
-      // Nothing to preview if the browser refuses to unlock audio.
-    },
-  );
+  playWhenUnlocked(context, sound);
 }

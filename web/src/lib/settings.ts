@@ -8,9 +8,14 @@ export interface Settings {
 
 const STORAGE_KEY = "settings";
 
+/**
+ * Both alerts are on out of the box. Nothing can actually make noise until the
+ * page has been interacted with (browsers keep audio locked until then), so a
+ * viewer who never opens the dialog is not ambushed on page load.
+ */
 const DEFAULT_SETTINGS: Settings = {
-  viewerAlertSound: false,
-  chatMessageSound: false,
+  viewerAlertSound: true,
+  chatMessageSound: true,
 };
 
 function readStoredSettings(): Settings {
