@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Columns2, Eye, MessageSquare, Plus, Rows2, Video, VideoOff, X } from "lucide-react";
+import { Columns2, Eye, MessageSquare, Plus, Rows2, X } from "lucide-react";
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { Chat } from "@/components/chat/chat";
 import { HeaderPortal } from "@/components/layout/header-portal";
@@ -61,7 +61,6 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newStreamName, setNewStreamName] = useState("");
   const [chatOpen, setChatOpen] = useState(false);
-  const [streamHidden, setStreamHidden] = useState(false);
   // Null until the viewer picks a layout, so rotating the device keeps
   // following the orientation default.
   const [tileLayoutOverride, setTileLayoutOverride] = useState<TileLayout | null>(null);
@@ -123,8 +122,6 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   const tileLayout = tileLayoutOverride ?? (isPortrait ? "vertical" : "horizontal");
   const isHorizontal = tileLayout === "horizontal";
   const groups = buildGroups(streamKeys);
-  // Hiding the stream keeps chat visible (and expanded) but drops the video.
-  const showChat = chatOpen || streamHidden;
   // Falls back to the first stream when the selected one has been removed.
   const activeChatKey =
     selectedChatKey !== null && streamKeys.includes(selectedChatKey)
@@ -158,16 +155,6 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
           )}
           <Button
             size="sm"
-            variant={streamHidden ? "default" : "secondary"}
-            onClick={() => setStreamHidden((hidden) => !hidden)}
-            aria-label={streamHidden ? "Show stream" : "Hide stream"}
-            title="Hide the video (keeps chat) — useful when streaming with OBS"
-          >
-            {streamHidden ? <VideoOff className="size-4" /> : <Video className="size-4" />}
-            <span className="hidden sm:inline">{streamHidden ? "Show stream" : "Hide stream"}</span>
-          </Button>
-          <Button
-            size="sm"
             variant={chatOpen ? "default" : "secondary"}
             onClick={() => setChatOpen((open) => !open)}
             aria-label={chatOpen ? "Hide chat" : "Show chat"}
@@ -180,7 +167,7 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
       </HeaderPortal>
 
       <div className="flex size-full flex-col md:flex-row">
-        <div className={cn("relative min-h-0 min-w-0 flex-1", streamHidden && "hidden")}>
+        <div className="relative min-h-0 min-w-0 flex-1">
           {isSingle ? (
             <Player
               streamKey={streamKeys[0]}
@@ -243,7 +230,7 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
           )}
         </div>
 
-        {showChat &&
+        {chatOpen &&
           isNarrow && (
             // Narrow viewports have no room for the video and a column of
             // chats, so one chat covers everything below the header and the
@@ -284,13 +271,8 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
             </Tabs>
           )}
 
-        {showChat && !isNarrow && (
-          <aside
-            className={cn(
-              "flex min-h-0 flex-col overflow-y-auto",
-              streamHidden ? "flex-1" : "w-80 shrink-0 border-l",
-            )}
-          >
+        {chatOpen && !isNarrow && (
+          <aside className="flex min-h-0 w-80 shrink-0 flex-col overflow-y-auto border-l">
             {streamKeys.map((streamKey) => {
               const collapsed = collapsedChats[streamKey] ?? false;
               return (
