@@ -62,15 +62,12 @@ function webAppManifest(): Plugin {
       display: "standalone",
       background_color: BRAND_COLOR,
       theme_color: BRAND_COLOR,
+      // Declared maskable as well as any: the artwork is full-bleed, and
+      // without it Android shrinks the icon onto a white plate instead of
+      // filling the tile. A round mask trims the corners of the room.
       icons: [
-        { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
-        { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
-        {
-          src: "/icon-maskable-512.png",
-          sizes: "512x512",
-          type: "image/png",
-          purpose: "maskable",
-        },
+        { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
+        { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
       ],
     },
     null,

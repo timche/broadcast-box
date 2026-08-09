@@ -18,16 +18,6 @@ SOURCE = "scripts/icon-source.png"
 # 192 and 512 for the manifest.
 SIZES = (32, 64, 180, 192, 512)
 
-# Android masks a maskable icon to an arbitrary shape and only guarantees the
-# centre 80%. The artwork is full-bleed, so it is inset onto a matching
-# background rather than letting a circle crop the TV out of frame.
-MASKABLE_SIZE = 512
-MASKABLE_INSET = 0.8
-
-# The whole scene turns to mush at favicon size, so the 32px icon is cropped to
-# the frog's face — (left, top, side) as fractions of the source.
-FAVICON_CROP = (0.17, 0.12, 0.45)
-
 
 def decode_png(path):
     """Decode an 8-bit non-interlaced RGB/RGBA PNG into (width, height, RGBA)."""
@@ -138,51 +128,6 @@ def resize(pixels, width, height, target):
     return out
 
 
-def crop_square(pixels, size, box):
-    left_fraction, top_fraction, side_fraction = box
-    left = int(size * left_fraction)
-    top = int(size * top_fraction)
-    side = int(size * side_fraction)
-
-    out = bytearray()
-    for y in range(top, top + side):
-        start = (y * size + left) * 4
-        out += pixels[start : start + side * 4]
-    return out, side
-
-
-def border_colour(pixels, size):
-    """Average of the outermost ring, so the maskable padding blends into the
-    artwork instead of framing it."""
-    r = g = b = 0
-    count = 0
-    for x in range(size):
-        for y in (0, size - 1):
-            index = (y * size + x) * 4
-            r += pixels[index]
-            g += pixels[index + 1]
-            b += pixels[index + 2]
-            count += 1
-    return (r // count, g // count, b // count, 255)
-
-
-def inset_onto_background(pixels, size, inset):
-    inner = int(size * inset)
-    scaled = resize(pixels, size, size, inner)
-    background = border_colour(pixels, size)
-
-    out = bytearray()
-    for _ in range(size * size):
-        out += bytes(background)
-
-    origin = (size - inner) // 2
-    for y in range(inner):
-        source = y * inner * 4
-        target = ((y + origin) * size + origin) * 4
-        out[target : target + inner * 4] = scaled[source : source + inner * 4]
-    return out
-
-
 def encode_png(pixels, size):
     stride = size * 4
     raw = bytearray()
@@ -226,17 +171,7 @@ if width != height:
     raise ValueError(f"{SOURCE} must be square, got {width}x{height}")
 
 for size in SIZES:
-    if size == 32:
-        face, face_size = crop_square(source, width, FAVICON_CROP)
-        scaled = resize(face, face_size, face_size, size)
-    else:
-        scaled = source if size == width else resize(source, width, height, size)
-
+    scaled = source if size == width else resize(source, width, height, size)
     write(f"public/icon-{size}.png", encode_png(scaled, size))
     if size == 32:
         write_ico("public/favicon.ico", encode_png(scaled, size))
-
-maskable = inset_onto_background(
-    resize(source, width, height, MASKABLE_SIZE), MASKABLE_SIZE, MASKABLE_INSET
-)
-write(f"public/icon-maskable-{MASKABLE_SIZE}.png", encode_png(maskable, MASKABLE_SIZE))
