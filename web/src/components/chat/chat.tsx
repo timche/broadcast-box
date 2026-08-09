@@ -37,12 +37,25 @@ const STATUS_LABEL: Record<ChatStatus, string> = {
   error: "Error",
 };
 
+/** `ts` is Unix milliseconds, per the backend's `chat.Message`. */
+const TIME_FORMAT = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" });
+const TIMESTAMP_FORMAT = new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium",
+  timeStyle: "medium",
+});
+
 function ChatLine({ message }: { message: ChatMessage }) {
   return (
     <MessageScrollerItem
       messageId={message.id}
       className="px-3 text-sm leading-snug [contain-intrinsic-size:auto_2rem]"
     >
+      <span
+        className="text-muted-foreground mr-1.5 text-xs tabular-nums"
+        title={TIMESTAMP_FORMAT.format(message.ts)}
+      >
+        {TIME_FORMAT.format(message.ts)}
+      </span>
       <span className="font-semibold" style={{ color: nameColor(message.displayName) }}>
         {message.displayName}
       </span>
