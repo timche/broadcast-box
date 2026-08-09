@@ -20,6 +20,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useChatMessageAlert } from "@/hooks/use-chat-message-alert";
 import { useIsPortrait } from "@/hooks/use-is-portrait";
 import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
+import { useLiveChatMessages } from "@/hooks/use-live-chat-messages";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { useViewerAlert } from "@/hooks/use-viewer-alert";
 import { getDisplayName } from "@/lib/display-name";
@@ -69,6 +70,7 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   const [collapsedChats, setCollapsedChats] = useState<Record<string, boolean>>({});
   const [viewerCounts, setViewerCounts] = useState<Record<string, number>>({});
   const [selectedChatKey, setSelectedChatKey] = useState<string | null>(null);
+  const [hasUnreadChat, setHasUnreadChat] = useState(false);
 
   const setChatChannelFor = useCallback((streamKey: string, channel: ChatConnection | null) => {
     setChatChannels((current) => ({ ...current, [streamKey]: channel }));
@@ -122,6 +124,22 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   const tileLayout = tileLayoutOverride ?? (isPortrait ? "vertical" : "horizontal");
   const isHorizontal = tileLayout === "horizontal";
   const groups = buildGroups(streamKeys);
+
+  useLiveChatMessages(chatChannels, () => {
+    if (!chatOpen) {
+      setHasUnreadChat(true);
+    }
+  });
+
+  useEffect(() => {
+    if (chatOpen) {
+      setHasUnreadChat(false);
+    }
+  }, [chatOpen]);
+
+  // Tile titlebars carry the viewer count, so the chat header beside them
+  // doesn't repeat it. A single stream has no titlebar, so it keeps the count.
+  const tilesShowViewers = !isSingle;
   // Falls back to the first stream when the selected one has been removed.
   const activeChatKey =
     selectedChatKey !== null && streamKeys.includes(selectedChatKey)
@@ -157,10 +175,19 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
             size="sm"
             variant={chatOpen ? "default" : "secondary"}
             onClick={() => setChatOpen((open) => !open)}
-            aria-label={chatOpen ? "Hide chat" : "Show chat"}
+            aria-label={
+              hasUnreadChat ? "Show chat, new messages" : chatOpen ? "Hide chat" : "Show chat"
+            }
+            className="relative"
           >
             <MessageSquare className="size-4" />
             <span className="hidden sm:inline">{chatOpen ? "Hide chat" : "Show chat"}</span>
+            {hasUnreadChat && (
+              <span
+                aria-hidden
+                className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-red-500"
+              />
+            )}
           </Button>
           <SettingsButton />
         </div>
@@ -286,7 +313,7 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
                   <Chat
                     title={isSingle ? undefined : streamKey}
                     channel={chatChannels[streamKey] ?? null}
-                    viewers={viewerCounts[streamKey] ?? 0}
+                    viewers={tilesShowViewers ? null : (viewerCounts[streamKey] ?? 0)}
                     collapsible={!isSingle}
                     collapsed={!isSingle && collapsed}
                     onCollapsedChange={(next) =>
