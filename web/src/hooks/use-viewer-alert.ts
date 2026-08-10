@@ -29,8 +29,10 @@ export function useViewerAlert() {
       return;
     }
 
-    if (getSettings().viewerAlertSound) {
-      playAlertSound(viewerCount > previousCount ? "viewer-join" : "viewer-leave");
+    const { viewerAlertSound, alertVolume } = getSettings();
+
+    if (viewerAlertSound) {
+      playAlertSound(viewerCount > previousCount ? "viewer-join" : "viewer-leave", alertVolume);
     }
   }, []);
 }

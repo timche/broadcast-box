@@ -16,13 +16,15 @@ export function useChatMessageAlert(
   getLocalDisplayName: () => string,
 ): void {
   useLiveChatMessages(connections, (message) => {
-    if (!getSettings().chatMessageSound) {
+    const { chatMessageSound, alertVolume } = getSettings();
+
+    if (!chatMessageSound) {
       return;
     }
     if (message.displayName === getLocalDisplayName()) {
       return;
     }
 
-    playAlertSound("chat-message");
+    playAlertSound("chat-message", alertVolume);
   });
 }
