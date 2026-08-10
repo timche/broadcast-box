@@ -134,9 +134,9 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
     }
   }, [chatOpen]);
 
-  // Tile titlebars carry the viewer count, so the chat header beside them
-  // doesn't repeat it. A single stream has no titlebar, so it keeps the count.
-  const tilesShowViewers = !isSingle;
+  // A single stream has no titlebar to carry its viewer count, so the count
+  // goes in the header instead.
+  const headerViewers = isSingle ? (viewerCounts[streamKeys[0]] ?? 0) : null;
   // Falls back to the first stream when the selected one has been removed.
   const activeChatKey =
     selectedChatKey !== null && streamKeys.includes(selectedChatKey)
@@ -147,6 +147,17 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
     <div className="relative w-full bg-black" style={{ height: `calc(100dvh - ${HEADER_HEIGHT})` }}>
       <HeaderPortal>
         <div className="flex items-center gap-2">
+          {headerViewers !== null && (
+            <span
+              role="status"
+              aria-label={`${headerViewers} watching`}
+              title={`${headerViewers} watching`}
+              className="text-muted-foreground flex shrink-0 items-center gap-1 text-sm tabular-nums"
+            >
+              <Eye className="size-4" />
+              {headerViewers}
+            </span>
+          )}
           <Button
             size="sm"
             variant="secondary"
@@ -287,7 +298,10 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
                 >
                   <Chat
                     channel={chatChannels[streamKey] ?? null}
-                    viewers={viewerCounts[streamKey] ?? 0}
+                    // Chat covers the tiles here, so it stands in for their
+                    // titlebars — except with a single stream, whose count is
+                    // in the header and stays visible behind chat.
+                    viewers={isSingle ? null : (viewerCounts[streamKey] ?? 0)}
                   />
                 </TabsContent>
               ))}
@@ -309,7 +323,6 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
                   <Chat
                     title={isSingle ? undefined : streamKey}
                     channel={chatChannels[streamKey] ?? null}
-                    viewers={tilesShowViewers ? null : (viewerCounts[streamKey] ?? 0)}
                     collapsible={!isSingle}
                     collapsed={!isSingle && collapsed}
                     onCollapsedChange={(next) =>
