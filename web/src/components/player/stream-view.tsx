@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { Columns2, Eye, MessageSquare, Plus, Rows2, X } from "lucide-react";
+import { Columns2, Expand, Eye, MessageSquare, Plus, Rows2, Shrink, X } from "lucide-react";
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { Chat } from "@/components/chat/chat";
 import { HeaderPortal } from "@/components/layout/header-portal";
@@ -18,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useChatMessageAlert } from "@/hooks/use-chat-message-alert";
+import { useControlsVisibility } from "@/hooks/use-controls-visibility";
 import { useIsNarrowViewport } from "@/hooks/use-is-narrow-viewport";
 import { useIsPortrait } from "@/hooks/use-is-portrait";
 import { useKeyboardInset } from "@/hooks/use-keyboard-inset";
@@ -64,6 +65,9 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   const [tileLayoutOverride, setTileLayoutOverride] = useState<TileLayout | null>(null);
   const [chatChannels, setChatChannels] = useState<Record<string, ChatConnection | null>>({});
 
+  // Streams over the whole viewport, header and chat included. Desktop only:
+  // a narrow viewport has nothing beside the streams to reclaim.
+  const [theaterMode, setTheaterMode] = useState(false);
   const [collapsedChats, setCollapsedChats] = useState<Record<string, boolean>>({});
   const [viewerCounts, setViewerCounts] = useState<Record<string, number>>({});
   const [selectedChatKey, setSelectedChatKey] = useState<string | null>(null);
@@ -137,6 +141,36 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   // A single stream has no titlebar to carry its viewer count, so the count
   // goes in the header instead.
   const headerViewers = isSingle ? (viewerCounts[streamKeys[0]] ?? 0) : null;
+
+  // Dropping to a narrow viewport leaves theater mode for good rather than
+  // holding it, so widening the window again doesn't resurrect it unasked.
+  useEffect(() => {
+    if (isNarrow) {
+      setTheaterMode(false);
+    }
+  }, [isNarrow]);
+
+  // The exit button is the only way out on screen, so Escape backs it up the
+  // way it does for fullscreen video.
+  useEffect(() => {
+    if (!theaterMode) {
+      return;
+    }
+
+    const exitOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setTheaterMode(false);
+      }
+    };
+    window.addEventListener("keydown", exitOnEscape);
+
+    return () => window.removeEventListener("keydown", exitOnEscape);
+  }, [theaterMode]);
+
+  // Mirrors the player's own overlays: the exit button rides the same
+  // pointer-idle fade as the video controls under it.
+  const { visible: exitVisible, containerProps: theaterProps } = useControlsVisibility();
+
   // Falls back to the first stream when the selected one has been removed.
   const activeChatKey =
     selectedChatKey !== null && streamKeys.includes(selectedChatKey)
@@ -144,7 +178,13 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
       : streamKeys[0];
 
   return (
-    <div className="relative w-full bg-black" style={{ height: `calc(100dvh - ${HEADER_HEIGHT})` }}>
+    <div
+      // Theater mode lifts the streams out of the layout and over the header,
+      // which stays mounted underneath so leaving puts everything back.
+      className={cn("bg-black", theaterMode ? "fixed inset-0 z-50" : "relative w-full")}
+      style={theaterMode ? undefined : { height: `calc(100dvh - ${HEADER_HEIGHT})` }}
+      {...(theaterMode ? theaterProps : {})}
+    >
       <HeaderPortal>
         <div className="flex items-center gap-2">
           {headerViewers !== null && (
@@ -178,6 +218,17 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
               {isHorizontal ? <Rows2 className="size-4" /> : <Columns2 className="size-4" />}
             </Button>
           )}
+          {!isNarrow && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => setTheaterMode(true)}
+              aria-label="Theater mode"
+              title="Fill the viewport with the stream"
+            >
+              <Expand className="size-4" />
+            </Button>
+          )}
           <Button
             size="sm"
             variant={chatOpen ? "default" : "secondary"}
@@ -199,6 +250,27 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
           <SettingsButton />
         </div>
       </HeaderPortal>
+
+      {theaterMode && (
+        <div
+          className={cn(
+            "absolute right-2 z-50 transition-opacity duration-300",
+            // Clears the tile titlebars, which own the same corner.
+            isSingle ? "top-2" : "top-8",
+            exitVisible ? "opacity-100" : "opacity-0",
+          )}
+        >
+          <button
+            type="button"
+            onClick={() => setTheaterMode(false)}
+            aria-label="Exit theater mode"
+            title="Exit theater mode"
+            className="rounded-full bg-black/60 p-1.5 text-white hover:bg-black/80"
+          >
+            <Shrink className="size-4" />
+          </button>
+        </div>
+      )}
 
       <div className="flex size-full flex-col md:flex-row">
         <div className="relative min-h-0 min-w-0 flex-1">
@@ -308,7 +380,9 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
             </Tabs>
           )}
 
-        {chatOpen && !isNarrow && (
+        {/* Theater mode gives the whole viewport to the streams, chat column
+            included; leaving it puts chat back as it was. */}
+        {chatOpen && !isNarrow && !theaterMode && (
           <aside className="flex min-h-0 w-80 shrink-0 flex-col overflow-y-auto border-l">
             {streamKeys.map((streamKey) => {
               const collapsed = collapsedChats[streamKey] ?? false;
