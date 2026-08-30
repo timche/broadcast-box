@@ -59,11 +59,6 @@ function buildGroups(streamKeys: string[]): string[][] {
   return groups;
 }
 
-/** Identifies a group's panel within the outer group, by position. */
-function groupPanelId(groupIndex: number): string {
-  return `group-${groupIndex}`;
-}
-
 /**
  * A panel group that resets its panels to an even split whenever `resetKey`
  * changes.
@@ -71,6 +66,12 @@ function groupPanelId(groupIndex: number): string {
  * Re-tiling used to reset the sizes by remounting the group, which took every
  * player inside it down with it: a fresh WHEP negotiation, new ICE and a new
  * SSE channel per stream, for nothing more than a device rotation.
+ *
+ * The panels inside deliberately carry no `id`, leaving them the generated
+ * ones: a group remembers a layout per panel set, under a key that joins the
+ * ids with a comma, and a viewer can name a stream anything — including
+ * something with a comma in it, which would alias two sets onto one remembered
+ * layout and hand the group a layout of the wrong length.
  */
 function EvenSplitPanelGroup({
   resetKey,
@@ -350,9 +351,9 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
               // Keyed on the position rather than the streams in it: buildGroups
               // rebalances when a stream is added, and a key naming the contents
               // would remount every player whose group it changed.
-              <Fragment key={groupPanelId(groupIndex)}>
+              <Fragment key={`group-${groupIndex}`}>
                 {groupIndex > 0 && <ResizableHandle />}
-                <ResizablePanel id={groupPanelId(groupIndex)} minSize={80}>
+                <ResizablePanel minSize={80}>
                   <EvenSplitPanelGroup
                     resetKey={retileKey}
                     orientation={isHorizontal ? "horizontal" : "vertical"}
@@ -360,7 +361,7 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
                     {groupKeys.map((streamKey, indexInGroup) => (
                       <Fragment key={streamKey}>
                         {indexInGroup > 0 && <ResizableHandle />}
-                        <ResizablePanel id={streamKey} minSize={80}>
+                        <ResizablePanel minSize={80}>
                           <div className="flex h-full flex-col overflow-hidden bg-black">
                             {!isSingle && (
                               <div className="flex h-6 shrink-0 items-center justify-between gap-2 bg-neutral-900 px-2 text-xs text-white">
