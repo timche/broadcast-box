@@ -158,7 +158,9 @@ export async function setupWhepConnection(
     }
 
     const sseUrl = link[SSE_REL]?.url;
-    if (sseUrl) {
+    // `close` cannot reach an EventSource that does not exist yet, so opening
+    // one after the session is already gone would leave it wired forever.
+    if (sseUrl && !closed) {
       eventSource = new EventSource(sseUrl);
       wireEventSource(eventSource, handlers, disconnect);
     }

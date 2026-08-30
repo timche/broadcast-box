@@ -67,14 +67,31 @@ export function Player({
       setupWhepConnection(streamKey, {
         videoRef,
         onChatChannel: chatEnabled ? (channel) => chatChannelRef.current?.(channel) : undefined,
-        onConnected: reset,
+        onConnected: () => {
+          if (cancelled) {
+            return;
+          }
+
+          reset();
+        },
         onDisconnected: () => {
+          // A setup already abandoned by an effect re-run must not reach the
+          // controller — the retry it queued would land on the next stream.
+          if (cancelled) {
+            return;
+          }
+
           currentConnection = null;
           // The frozen last frame is not playback; a reconnect starts over.
           setStreamState("Loading");
+          chatChannelRef.current?.(null);
           schedule();
         },
         onStreamStatus: (status) => {
+          if (cancelled) {
+            return;
+          }
+
           statusChangeRef.current?.(streamKey, status);
 
           if (!status.isOnline) {
@@ -129,7 +146,9 @@ export function Player({
     return () => {
       cancelled = true;
       connectRef.current = null;
-      cancel();
+      // reset, not cancel: the effect re-runs on a stream change without
+      // remounting, and a spent attempt count would carry over to the new one.
+      reset();
       window.removeEventListener("beforeunload", beforeUnload);
       currentConnection?.close();
       chatChannelRef.current?.(null);

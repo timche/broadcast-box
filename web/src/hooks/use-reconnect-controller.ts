@@ -11,7 +11,7 @@ interface ReconnectOptions {
 }
 
 export interface ReconnectController {
-  /** A retry is pending, either on a timer or waiting for the network. */
+  /** A retry is waiting to start, or is in flight. */
   isReconnecting: boolean;
   /** Every attempt has been spent; only a manual retry goes any further. */
   isExhausted: boolean;
@@ -70,7 +70,6 @@ export function useReconnectController(
 
   const run = useCallback(() => {
     clearPending();
-    setIsReconnecting(false);
     reconnectRef.current();
   }, [clearPending]);
 
@@ -104,6 +103,7 @@ export function useReconnectController(
   const retryNow = useCallback(() => {
     attemptRef.current = 0;
     setIsExhausted(false);
+    setIsReconnecting(true);
     run();
   }, [run]);
 
