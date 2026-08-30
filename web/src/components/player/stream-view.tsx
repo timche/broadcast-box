@@ -1,6 +1,13 @@
 import { useNavigate } from "@tanstack/react-router";
 import { Columns2, Expand, Eye, MessageSquare, Plus, Rows2, Shrink, X } from "lucide-react";
-import { Fragment, useCallback, useEffect, useState } from "react";
+import {
+  Fragment,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useState,
+} from "react";
+import { useGroupRef } from "react-resizable-panels";
 import { Chat } from "@/components/chat/chat";
 import { HeaderPortal } from "@/components/layout/header-portal";
 import { SettingsButton } from "@/components/layout/settings-button";
@@ -50,6 +57,63 @@ function buildGroups(streamKeys: string[]): string[][] {
     groups.push(streamKeys.slice(i, i + groupSize));
   }
   return groups;
+}
+
+/**
+ * A panel group that resets its panels to an even split whenever `resetKey`
+ * changes.
+ *
+ * Re-tiling used to reset the sizes by remounting the group, which took every
+ * player inside it down with it: a fresh WHEP negotiation, new ICE and a new
+ * SSE channel per stream, for nothing more than a device rotation.
+ *
+ * The panels inside deliberately carry no `id`, leaving them the generated
+ * ones: a group remembers a layout per panel set, under a key that joins the
+ * ids with a comma, and a viewer can name a stream anything — including
+ * something with a comma in it, which would alias two sets onto one remembered
+ * layout and hand the group a layout of the wrong length.
+ */
+function EvenSplitPanelGroup({
+  resetKey,
+  orientation,
+  children,
+}: {
+  resetKey: string;
+  orientation: "horizontal" | "vertical";
+  children: ReactNode;
+}) {
+  const groupRef = useGroupRef();
+
+  useEffect(() => {
+    // A frame later than the commit: a panel added in this render only reaches
+    // the group on its next one, and a layout naming an unregistered panel is
+    // rejected.
+    const frame = requestAnimationFrame(() => {
+      const group = groupRef.current;
+      if (group === null) {
+        return;
+      }
+
+      // Taken from the group itself rather than from the streams, so the layout
+      // covers exactly the panels it holds however far behind the tiles it is.
+      const panelIds = Object.keys(group.getLayout());
+      if (panelIds.length === 0) {
+        return;
+      }
+
+      group.setLayout(
+        Object.fromEntries(panelIds.map((panelId) => [panelId, 100 / panelIds.length])),
+      );
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [resetKey, groupRef]);
+
+  return (
+    <ResizablePanelGroup groupRef={groupRef} orientation={orientation}>
+      {children}
+    </ResizablePanelGroup>
+  );
 }
 
 export function StreamView({ streamKeys }: { streamKeys: string[] }) {
@@ -125,6 +189,9 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
   const tileLayout = tileLayoutOverride ?? (isPortrait ? "vertical" : "horizontal");
   const isHorizontal = tileLayout === "horizontal";
   const groups = buildGroups(streamKeys);
+  // Every arrangement the tiles can take, so any change to one resets the
+  // panels back to an even split.
+  const retileKey = `${tileLayout}:${streamKeys.join("/")}`;
 
   useLiveChatMessages(chatChannels, () => {
     if (!chatOpen) {
@@ -274,29 +341,29 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
 
       <div className="flex size-full flex-col md:flex-row">
         <div className="relative min-h-0 min-w-0 flex-1">
-          {isSingle ? (
-            <Player
-              streamKey={streamKeys[0]}
-              onChatChannel={(c) => setChatChannelFor(streamKeys[0], c)}
-              onStreamStatusChange={handleStreamStatus}
-            />
-          ) : (
-            // Re-tiling on a stream set or layout change is done by remounting
-            // the group (keyed on both) so panel sizes reset to an even split.
-            <ResizablePanelGroup
-              key={`${tileLayout}:${streamKeys.join("/")}`}
-              orientation={isHorizontal ? "vertical" : "horizontal"}
-            >
-              {groups.map((groupKeys, groupIndex) => (
-                <Fragment key={groupKeys.join("/")}>
-                  {groupIndex > 0 && <ResizableHandle />}
-                  <ResizablePanel minSize={80}>
-                    <ResizablePanelGroup orientation={isHorizontal ? "horizontal" : "vertical"}>
-                      {groupKeys.map((streamKey, indexInGroup) => (
-                        <Fragment key={streamKey}>
-                          {indexInGroup > 0 && <ResizableHandle />}
-                          <ResizablePanel minSize={80}>
-                            <div className="flex h-full flex-col overflow-hidden bg-black">
+          {/* One stream goes through the same panel tree as many, minus the
+              titlebar, so adding a second one leaves the first player mounted. */}
+          <EvenSplitPanelGroup
+            resetKey={retileKey}
+            orientation={isHorizontal ? "vertical" : "horizontal"}
+          >
+            {groups.map((groupKeys, groupIndex) => (
+              // Keyed on the position rather than the streams in it: buildGroups
+              // rebalances when a stream is added, and a key naming the contents
+              // would remount every player whose group it changed.
+              <Fragment key={`group-${groupIndex}`}>
+                {groupIndex > 0 && <ResizableHandle />}
+                <ResizablePanel minSize={80}>
+                  <EvenSplitPanelGroup
+                    resetKey={retileKey}
+                    orientation={isHorizontal ? "horizontal" : "vertical"}
+                  >
+                    {groupKeys.map((streamKey, indexInGroup) => (
+                      <Fragment key={streamKey}>
+                        {indexInGroup > 0 && <ResizableHandle />}
+                        <ResizablePanel minSize={80}>
+                          <div className="flex h-full flex-col overflow-hidden bg-black">
+                            {!isSingle && (
                               <div className="flex h-6 shrink-0 items-center justify-between gap-2 bg-neutral-900 px-2 text-xs text-white">
                                 <span className="truncate">{streamKey}</span>
                                 <span className="flex shrink-0 items-center gap-1">
@@ -317,23 +384,23 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
                                   </button>
                                 </span>
                               </div>
-                              <div className="relative min-h-0 flex-1">
-                                <Player
-                                  streamKey={streamKey}
-                                  onChatChannel={(c) => setChatChannelFor(streamKey, c)}
-                                  onStreamStatusChange={handleStreamStatus}
-                                />
-                              </div>
+                            )}
+                            <div className="relative min-h-0 flex-1">
+                              <Player
+                                streamKey={streamKey}
+                                onChatChannel={(c) => setChatChannelFor(streamKey, c)}
+                                onStreamStatusChange={handleStreamStatus}
+                              />
                             </div>
-                          </ResizablePanel>
-                        </Fragment>
-                      ))}
-                    </ResizablePanelGroup>
-                  </ResizablePanel>
-                </Fragment>
-              ))}
-            </ResizablePanelGroup>
-          )}
+                          </div>
+                        </ResizablePanel>
+                      </Fragment>
+                    ))}
+                  </EvenSplitPanelGroup>
+                </ResizablePanel>
+              </Fragment>
+            ))}
+          </EvenSplitPanelGroup>
         </div>
 
         {chatOpen &&
