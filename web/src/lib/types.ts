@@ -78,4 +78,12 @@ export interface LayersMessagePayload {
   [mediaId: string]: { layers: Array<{ encodingId: string }> } | undefined;
 }
 
-export type StreamState = "Loading" | "Playing" | "Offline" | "Error";
+export type StreamState =
+  | "Loading"
+  | "Playing"
+  | "Offline"
+  | "Error"
+  /** The connection dropped and a retry is pending. */
+  | "Reconnecting"
+  /** The retries ran out; recovering now needs the viewer to ask for it. */
+  | "Disconnected";
