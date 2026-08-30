@@ -1,6 +1,6 @@
 import { parseLinkHeader } from "@web3-storage/parse-link-header";
 import type { RefObject } from "react";
-import { api, bearer } from "@/lib/api";
+import { api, bearer, getErrorStatus } from "@/lib/api";
 import type { StreamStatus } from "@/lib/types";
 import { type ChatConnection, createChatConnection } from "@/lib/webrtc/chat";
 
@@ -14,6 +14,16 @@ const SSE_REL = "urn:ietf:params:whep:ext:core:server-sent-events";
 const ICE_DISCONNECT_GRACE_MS = 4_000;
 
 export class WhepError extends Error {}
+
+/**
+ * Whether a failed setup is worth retrying. A rejected stream key or an unknown
+ * stream answers the same way however long we keep asking.
+ */
+export function isFatalWhepError(error: unknown): boolean {
+  const status = getErrorStatus(error);
+
+  return status === 400 || status === 401 || status === 403 || status === 404;
+}
 
 /** A live WHEP session: the peer connection plus its SSE channel. */
 export interface WhepConnection {
