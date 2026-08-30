@@ -6,7 +6,7 @@ import { useControlsVisibility } from "@/hooks/use-controls-visibility";
 import type { StreamState, StreamStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import type { ChatConnection } from "@/lib/webrtc/chat";
-import { setupWhepConnection } from "@/lib/webrtc/whep";
+import { setupWhepConnection, type WhepConnection } from "@/lib/webrtc/whep";
 
 interface PlayerProps {
   streamKey: string;
@@ -38,7 +38,7 @@ export function Player({
   const { visible: controlsVisible, containerProps } = useControlsVisibility();
 
   useEffect(() => {
-    let currentConnection: RTCPeerConnection | null = null;
+    let currentConnection: WhepConnection | null = null;
     let cancelled = false;
 
     const video = videoRef.current;
@@ -46,47 +46,49 @@ export function Player({
       video.muted = true;
     }
 
-    const connect = () => {
-      setupWhepConnection(streamKey, {
-        videoRef,
-        onChatChannel: chatEnabled ? (channel) => chatChannelRef.current?.(channel) : undefined,
-        onOffline: () => {
+    setupWhepConnection(streamKey, {
+      videoRef,
+      onChatChannel: chatEnabled ? (channel) => chatChannelRef.current?.(channel) : undefined,
+      onConnected: () => {
+        setStreamState("Loading");
+      },
+      onDisconnected: () => {
+        currentConnection = null;
+        setStreamState("Error");
+      },
+      onStreamStatus: (status) => {
+        statusChangeRef.current?.(streamKey, status);
+
+        if (!status.isOnline) {
           setStreamState("Offline");
-        },
-        onStreamRestart: connect,
-        onStreamStatus: (status) => {
-          statusChangeRef.current?.(streamKey, status);
-
-          if (!status.isOnline) {
-            setStreamState("Offline");
-            return;
-          }
-          const currentVideo = videoRef.current;
-          if (
-            currentVideo !== null &&
-            !currentVideo.paused &&
-            currentVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
-          ) {
-            setStreamState("Playing");
-            return;
-          }
-          setStreamState("Loading");
-        },
+          return;
+        }
+        const currentVideo = videoRef.current;
+        if (
+          currentVideo !== null &&
+          !currentVideo.paused &&
+          currentVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+        ) {
+          setStreamState("Playing");
+          return;
+        }
+        setStreamState("Loading");
+      },
+    })
+      .then((connection) => {
+        if (cancelled) {
+          connection.close();
+          return;
+        }
+        currentConnection = connection;
       })
-        .then((connection) => {
-          if (cancelled) {
-            connection.close();
-            return;
-          }
-          currentConnection = connection;
-        })
-        .catch(() => {
-          setStreamState("Error");
-          toast.add({ description: `Could not connect to "${streamKey}".`, type: "error" });
-        });
-    };
-
-    connect();
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+        setStreamState("Error");
+        toast.add({ description: `Could not connect to "${streamKey}".`, type: "error" });
+      });
 
     const beforeUnload = () => currentConnection?.close();
     window.addEventListener("beforeunload", beforeUnload);
