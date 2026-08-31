@@ -44,6 +44,8 @@ export interface WhepSession {
  */
 export interface StatusResult {
   streamKey: string;
+  /** Whether a broadcaster is publishing right now: a session outlives its host. */
+  isOnline: boolean;
   isPublic: boolean;
   motd: string;
   streamStart: string;
