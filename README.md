@@ -23,6 +23,7 @@
 - [URL Parameters](#url-parameters)
 - [Environment Variables](#environment-variables)
 - [CLI Flags](#cli-flags)
+- [Site Password](#site-password)
 - [Stream Profile Policy](#stream-profile-policy)
 - [Webhooks](#webhooks)
 - [Network Test on Start](#network-test-on-start)
@@ -285,6 +286,7 @@ The frontend can be configured by passing these URL Parameters.
 | `STREAM_PROFILE_PATH`   | Path to store stream profile configurations. Default is `profiles`.                                                                       |
 | `STREAM_PROFILE_POLICY` | Policy configuration for local reserved profiles. Default is `ANYONE_WITH_RESERVED`. See [Stream Profile Policy](#stream-profile-policy). |
 | `WEBHOOK_URL`           | URL for a webhook backend used to authorize/log publish (`WHIP`) and subscribe (`WHEP`) requests. See [Webhooks](#webhooks).            |
+| `SITE_PASSWORD`         | When set, every page and viewer endpoint requires this password. See [Site Password](#site-password).                                     |
 
 ### Frontend Configuration
 
@@ -364,6 +366,32 @@ Example:
 ```shell
 go run . -createNewProfile -streamKey MyStream
 ```
+
+## Site Password
+
+Set `SITE_PASSWORD` to put the whole site behind one shared password. Leave it unset and nothing changes.
+
+The server answers every request without it with an HTTP `401`, so the browser draws its own password
+prompt. Nothing of the site is served until the password is right: no page, no JavaScript bundle, not
+even an indication of what the server is running or how to log into it.
+
+The prompt asks for a username as well, because the dialog belongs to the browser and that field
+cannot be suppressed. Only the password is checked, so tell your viewers to leave the username blank
+or type anything at all.
+
+The gate covers the frontend, `/api/status`, `/api/whep`, `/api/sse` and `/api/layer`, which is enough
+that knowing a stream key no longer lets anyone watch. It does not cover `/api/whip`: a WHIP broadcaster
+has one `Authorization` header and the stream key already occupies it. Publishing keeps its own
+authorization, so restrict it with [Stream Profile Policy](#stream-profile-policy) rather than this.
+
+Two things worth knowing before relying on it:
+
+- **The password is checked in the origin, not at a proxy.** WebRTC media never passes through an HTTP
+  proxy, so the SDP answer hands every viewer this server's public IP as ICE candidates. Anyone who has
+  loaded the site once can reach the origin directly, which is why a password enforced only at a CDN or
+  firewall can be walked around.
+- **Serve over HTTPS.** Basic authentication sends the password on every request. TLS is what keeps it
+  from being readable in transit, and a `Secure` deployment is assumed.
 
 ## Stream Profile Policy
 

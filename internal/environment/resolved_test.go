@@ -14,7 +14,7 @@ func resolveWith(t *testing.T, overrides map[string]string) {
 
 	for _, key := range []string{
 		DisableStatus, FrontendDisabled, WebhookURL, StreamProfilePolicy,
-		FrontendAdminToken, LoggingAPIEnabled, LoggingAPIKey, AppendCandidate,
+		SitePassword, FrontendAdminToken, LoggingAPIEnabled, LoggingAPIKey, AppendCandidate,
 		STUNServers, DebugIncomingAPIRequest, DebugPrintSSEMessages,
 		DebugPrintOffer, DebugPrintAnswer,
 	} {
@@ -114,6 +114,7 @@ func TestStringAccessorsReturnValueVerbatim(t *testing.T) {
 	}{
 		"GetWebhookURL":          {WebhookURL, GetWebhookURL},
 		"GetStreamProfilePolicy": {StreamProfilePolicy, GetStreamProfilePolicy},
+		"GetSitePassword":        {SitePassword, GetSitePassword},
 		"GetFrontendAdminToken":  {FrontendAdminToken, GetFrontendAdminToken},
 		"GetLoggingAPIKey":       {LoggingAPIKey, GetLoggingAPIKey},
 		"GetAppendCandidate":     {AppendCandidate, GetAppendCandidate},

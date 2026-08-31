@@ -19,6 +19,7 @@ const (
 	StreamProfilePath   = "STREAM_PROFILE_PATH"
 	StreamProfilePolicy = "STREAM_PROFILE_POLICY"
 	WebhookURL          = "WEBHOOK_URL"
+	SitePassword        = "SITE_PASSWORD"
 
 	// FRONTEND
 	FrontendDisabled   = "DISABLE_FRONTEND"
