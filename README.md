@@ -201,8 +201,9 @@ Install dependencies with `bun install` in the `web` directory, then:
 - `bun run typecheck` type-checks the project
 - `bun run lint` / `bun run format` run oxlint and oxfmt
 
-> Streams you watch are remembered locally (in `localStorage`) and shown under **Previously watched**,
-> which is handy when `DISABLE_STATUS` is set and live stream discovery is unavailable.
+> The **Streams** list shows what is live now, followed by the streams you have watched before, which
+> are remembered locally (in `localStorage`). The remembered half is handy when `DISABLE_STATUS` is set
+> and live stream discovery is unavailable.
 
 If everything is successful, you should see output similar to:
 

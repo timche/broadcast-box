@@ -12,8 +12,7 @@ import { Chat } from "@/components/chat/chat";
 import { HeaderPortal } from "@/components/layout/header-portal";
 import { SettingsButton } from "@/components/layout/settings-button";
 import { Player } from "@/components/player/player";
-import { NowLive } from "@/components/now-live";
-import { PreviouslyWatched } from "@/components/previously-watched";
+import { StreamList } from "@/components/stream-list";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -156,7 +155,7 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
     [reportViewerCount],
   );
 
-  // Remember every stream watched (used for "Previously watched").
+  // Remember every stream watched (used by the stream list).
   useEffect(() => {
     streamKeys.forEach((name) => addWatchedStream(name));
   }, [streamKeys]);
@@ -494,8 +493,7 @@ export function StreamView({ streamKeys }: { streamKeys: string[] }) {
               }
             }}
           />
-          <NowLive showHeader={false} exclude={streamKeys} onSelect={addStream} />
-          <PreviouslyWatched showHeader={false} exclude={streamKeys} onSelect={addStream} />
+          <StreamList showHeader={false} exclude={streamKeys} onSelect={addStream} />
           <DialogFooter>
             <Button variant="secondary" onClick={() => setIsAddOpen(false)}>
               Cancel
