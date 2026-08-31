@@ -23,6 +23,7 @@ var (
 	frontendDisabled        bool
 	webhookURL              string
 	streamProfilePolicy     string
+	sitePassword            string
 	frontendAdminToken      string
 	loggingAPIEnabled       bool
 	loggingAPIKey           string
@@ -46,6 +47,7 @@ func ResolveEnvironmentVariables() {
 	frontendDisabled = isSet(FrontendDisabled)
 	webhookURL = os.Getenv(WebhookURL)
 	streamProfilePolicy = os.Getenv(StreamProfilePolicy)
+	sitePassword = os.Getenv(SitePassword)
 	frontendAdminToken = os.Getenv(FrontendAdminToken)
 	loggingAPIEnabled = isTrue(LoggingAPIEnabled)
 	loggingAPIKey = os.Getenv(LoggingAPIKey)
@@ -77,6 +79,12 @@ func GetWebhookURL() string {
 // GetStreamProfilePolicy returns STREAM_PROFILE_POLICY verbatim.
 func GetStreamProfilePolicy() string {
 	return streamProfilePolicy
+}
+
+// GetSitePassword returns SITE_PASSWORD, or an empty string when the site is
+// not password protected.
+func GetSitePassword() string {
+	return sitePassword
 }
 
 // GetFrontendAdminToken returns FRONTEND_ADMIN_TOKEN, or an empty string when no

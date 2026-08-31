@@ -7,8 +7,10 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/glimesh/broadcast-box/internal/environment"
+	"github.com/glimesh/broadcast-box/internal/server/auth"
 	adminHandlers "github.com/glimesh/broadcast-box/internal/server/handlers/admin"
 	whipHandlers "github.com/glimesh/broadcast-box/internal/server/handlers/whip"
 )
@@ -46,6 +48,12 @@ func GetServeMuxHandler() http.HandlerFunc {
 	serverMux.HandleFunc("/api/admin/profiles/add-profile", corsHandler(adminHandlers.ProfileAddHandler))
 	serverMux.HandleFunc("/api/admin/profiles/remove-profile", corsHandler(adminHandlers.ProfileRemoveHandler))
 
+	// The site password gate wraps the whole mux rather than each route, so a
+	// route added later is gated by default. Everything is behind it: the
+	// frontend assets as much as the API, so that an unauthenticated visitor
+	// cannot even tell what this server is running.
+	gatedMux := auth.Middleware(serverMux.ServeHTTP)
+
 	// Path middleware
 	debugOutputWebRequests := environment.ShouldDebugIncomingAPIRequest()
 	handler := http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
@@ -60,10 +68,25 @@ func GetServeMuxHandler() http.HandlerFunc {
 			}
 		}
 
-		serverMux.ServeHTTP(responseWriter, request)
+		if isPublishPath(request.URL.Path) {
+			serverMux.ServeHTTP(responseWriter, request)
+
+			return
+		}
+
+		gatedMux(responseWriter, request)
 	})
 
 	return handler
+}
+
+// isPublishPath reports whether a request is OBS or FFmpeg publishing a
+// stream. WHIP gives a broadcaster one Authorization header and the stream key
+// already occupies it, so there is no room left for Basic credentials. These
+// paths keep their own stream key and profile token authorization instead; see
+// STREAM_PROFILE_POLICY for requiring a reserved token there.
+func isPublishPath(requestPath string) bool {
+	return requestPath == "/api/whip" || strings.HasPrefix(requestPath, "/api/whip/")
 }
 
 func RedirectToHttpsHandler(httpWriter http.ResponseWriter, request *http.Request) {
