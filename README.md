@@ -385,13 +385,19 @@ variable always overrides `PASSWORD`, and leaving all three unset changes nothin
 
 ### Watching
 
-The server answers every request without the site password with an HTTP `401`, so the browser draws its own password
-prompt. Nothing of the site is served until the password is right: no page, no JavaScript bundle, not
-even an indication of what the server is running or how to log into it.
+The server answers every request without the site password with a single password field, and nothing
+else: no page, no JavaScript bundle, not even an indication of what the server is running. Entering
+the password sets a cookie, and that cookie is what the browser sends from then on.
 
-The prompt asks for a username as well, because the dialog belongs to the browser and that field
-cannot be suppressed. Only the password is checked, so tell your viewers to leave the username blank
-or type anything at all.
+The cookie lasts until the password changes. It survives closing the browser and restarting the
+server, so viewers log in once rather than every time. Changing `SITE_PASSWORD` (or `PASSWORD`) ends
+every session at once, which is the way to take access back from someone who has it.
+
+HTTP Basic credentials are accepted too, which keeps scripts and monitoring working:
+
+```sh
+curl -u :yourpassword https://your-server/api/status
+```
 
 The gate covers the frontend, `/api/status`, `/api/whep`, `/api/sse` and `/api/layer`, which is enough
 that knowing a stream key no longer lets anyone watch. It does not cover `/api/whip`, which is what

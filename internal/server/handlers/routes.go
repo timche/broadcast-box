@@ -38,6 +38,9 @@ func GetServeMuxHandler() http.HandlerFunc {
 	// Publishing password, for browser publishers who are already past the gate.
 	serverMux.HandleFunc("/api/stream-password", corsHandler(auth.StreamPasswordHandler))
 
+	// The site password form. Reached without a session by definition.
+	serverMux.HandleFunc("/api/login", auth.LoginHandler)
+
 	// Logging and status endpoints
 	serverMux.HandleFunc("/api/log", corsHandler(logHandler))
 	serverMux.HandleFunc("/api/status", corsHandler(statusHandler))
@@ -71,7 +74,7 @@ func GetServeMuxHandler() http.HandlerFunc {
 			}
 		}
 
-		if isPublishPath(request.URL.Path) || isAdminPath(request.URL.Path) {
+		if isPublishPath(request.URL.Path) || isAdminPath(request.URL.Path) || isLoginPath(request.URL.Path) {
 			serverMux.ServeHTTP(responseWriter, request)
 
 			return
@@ -102,6 +105,13 @@ func isPublishPath(requestPath string) bool {
 // two secrets, and would gate a stronger credential behind a weaker shared one.
 func isAdminPath(requestPath string) bool {
 	return strings.HasPrefix(requestPath, "/api/admin/")
+}
+
+// isLoginPath reports whether a request is someone submitting the site
+// password. The gate cannot cover its own door: gating this would refuse the
+// one request whose whole purpose is to get past it.
+func isLoginPath(requestPath string) bool {
+	return requestPath == "/api/login"
 }
 
 func RedirectToHttpsHandler(httpWriter http.ResponseWriter, request *http.Request) {

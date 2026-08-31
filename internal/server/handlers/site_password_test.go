@@ -3,6 +3,8 @@ package handlers
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/glimesh/broadcast-box/internal/environment"
@@ -37,7 +39,8 @@ func requestPath(t *testing.T, handler http.HandlerFunc, method string, target s
 }
 
 // The point of gating the assets as well as the API: an unauthenticated
-// visitor must not be able to tell what this server is running.
+// visitor must not be able to tell what this server is running. They get the
+// password field in place of every one of them, and nothing else.
 func TestSitePasswordGatesTheFrontend(t *testing.T) {
 	handler := gatedHandler(t, "hunter2")
 
@@ -45,12 +48,39 @@ func TestSitePasswordGatesTheFrontend(t *testing.T) {
 		recorder := requestPath(t, handler, http.MethodGet, target)
 
 		if recorder.Code != http.StatusUnauthorized {
-			t.Fatalf("expected %s to be challenged, got %d", target, recorder.Code)
+			t.Fatalf("expected %s to be refused, got %d", target, recorder.Code)
 		}
 
-		if body := recorder.Body.String(); body != "" {
-			t.Fatalf("expected %s to reveal nothing, got %q", target, body)
+		body := recorder.Body.String()
+
+		if !strings.Contains(body, `name="password"`) {
+			t.Fatalf("expected %s to serve the password field, got %q", target, body)
 		}
+
+		if strings.Contains(body, "Broadcast Box") || strings.Contains(body, "/assets/") {
+			t.Fatalf("expected %s to reveal nothing of the app, got %q", target, body)
+		}
+	}
+}
+
+// The door cannot be behind the gate it opens.
+func TestSitePasswordDoesNotGateTheLoginForm(t *testing.T) {
+	handler := gatedHandler(t, "hunter2")
+
+	form := url.Values{"password": {"hunter2"}}
+	loginRequest := httptest.NewRequest(
+		http.MethodPost, "http://example.com/api/login", strings.NewReader(form.Encode()))
+	loginRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, loginRequest)
+
+	if recorder.Code != http.StatusSeeOther {
+		t.Fatalf("expected the login to be accepted, got %d", recorder.Code)
+	}
+
+	if len(recorder.Result().Cookies()) != 1 {
+		t.Fatal("expected a session cookie")
 	}
 }
 

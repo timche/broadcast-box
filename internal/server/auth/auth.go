@@ -8,32 +8,32 @@
 // origin directly and skip an edge-only gate entirely. Enforcing here holds
 // however the request arrived.
 //
-// Basic authentication rather than a login page and a session cookie, because
-// the browser draws the prompt itself. Nothing of ours has to be served to an
-// unauthenticated visitor: no app shell, no bundle, no route names, not even
-// which software this is. A login page would have to be reachable in order to
-// be rendered, and would carry all of that with it.
+// A password field and a cookie, rather than the HTTP Basic prompt this
+// started as. Basic credentials live in the browser's authentication cache,
+// which is cleared when the browser closes, so every restart asked for the
+// password again and there was no way to keep anyone logged in. The cookie is
+// derived from the password itself, so it survives restarts on both sides and
+// stops working the moment the password is rotated.
+//
+// The cost is that a login page has to be reachable in order to be rendered.
+// It is kept to a single unbranded password field served by this server, so
+// what an unauthenticated visitor can see is that field and nothing else: no
+// app shell, no bundle, no route names, not even which software this is.
+//
+// Basic credentials are still accepted when they are sent, which keeps scripts
+// and monitoring working, but nothing is ever challenged with
+// WWW-Authenticate any more - that header is what made browsers draw the
+// prompt this replaces.
 package auth
 
 import (
 	"crypto/subtle"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/glimesh/broadcast-box/internal/environment"
 )
-
-// Browsers print the realm in their password dialog, which makes it the one
-// string an unauthenticated visitor can read. It is therefore empty: naming
-// the site, or explaining how to log in, would be telling someone who has not
-// authenticated something they have no business knowing. People who should be
-// here already know what this is and what to type.
-//
-// The dialog draws a username field regardless and there is no way to suppress
-// it; the dialog belongs to the browser. Ignoring the username server-side is
-// the closest thing to a password-only prompt that Basic authentication
-// allows.
-const realm = ""
 
 // IsEnabled reports whether a site password was configured. With no password
 // set the gate is inert and every handler behaves as it did before.
@@ -58,11 +58,12 @@ func passwordMatches(submitted string) bool {
 	return subtle.ConstantTimeCompare([]byte(submitted), []byte(configured)) == 1
 }
 
-// isAuthorized reports whether a request carries the site password.
+// isAuthorized reports whether a request carries the site password as HTTP
+// Basic credentials.
 //
 // The username is ignored. There is one shared secret here, not a set of
 // accounts, and demanding a particular username would only be a second thing
-// for viewers to get wrong; the browser lets them leave it blank.
+// to get wrong.
 func isAuthorized(request *http.Request) bool {
 	_, password, ok := request.BasicAuth()
 	if !ok {
@@ -72,12 +73,13 @@ func isAuthorized(request *http.Request) bool {
 	return passwordMatches(password)
 }
 
-// Middleware refuses a request that does not carry the site password.
+// Middleware refuses a request that carries neither a session cookie nor the
+// site password.
 //
 // It is not applied to publishing. OBS and FFmpeg send the stream key in the
 // one Authorization header WHIP gives them, so there is no room left for
-// Basic credentials; publishing keeps its own stream key and profile token
-// authorization instead. See STREAM_PROFILE_POLICY for tightening that.
+// credentials of any kind; publishing keeps its own stream key and profile
+// token authorization instead. See STREAM_PROFILE_POLICY for tightening that.
 func Middleware(next func(responseWriter http.ResponseWriter, request *http.Request)) http.HandlerFunc {
 	return func(responseWriter http.ResponseWriter, request *http.Request) {
 		if !IsEnabled() {
@@ -86,38 +88,75 @@ func Middleware(next func(responseWriter http.ResponseWriter, request *http.Requ
 			return
 		}
 
+		// Checked first, and without the throttle: the cookie rides along on
+		// every request a page makes, so charging it would drain the bucket
+		// during ordinary viewing. It is a 256 bit HMAC, which is not
+		// something to guess at rather than something to rate limit.
+		if hasSession(request) {
+			next(responseWriter, request)
+
+			return
+		}
+
+		// Basic credentials still work, for scripts and monitoring. A request
+		// that carries none is not an attempt at the password, so it costs
+		// nothing and simply gets the password field.
+		if _, _, hasCredentials := request.BasicAuth(); !hasCredentials {
+			refuse(responseWriter, request, http.StatusUnauthorized)
+
+			return
+		}
+
 		if !logins.allow(time.Now()) {
-			// Deliberately answered without evaluating the credentials. Were
-			// they checked here, an attacker could keep guessing through the
-			// throttle and simply watch for the response that differs, which
-			// is the search the throttle exists to prevent.
-			challenge(responseWriter, http.StatusTooManyRequests)
+			// Refused without comparing anything. Were the password checked
+			// here, an attacker could keep guessing through the throttle and
+			// watch for the response that differs, which is the search the
+			// throttle exists to prevent.
+			refuse(responseWriter, request, http.StatusTooManyRequests)
 
 			return
 		}
 
 		if !isAuthorized(request) {
-			challenge(responseWriter, http.StatusUnauthorized)
+			refuse(responseWriter, request, http.StatusUnauthorized)
 
 			return
 		}
 
-		// A correct password costs nothing. Basic credentials ride along on
-		// every request a page makes, so charging them would drain the bucket
-		// during ordinary viewing and lock out the people who know it.
+		// A correct password costs nothing: credentials ride along on every
+		// request a page makes, so charging them would drain the bucket during
+		// ordinary viewing and lock out the people who know it.
 		logins.refund()
 
 		next(responseWriter, request)
 	}
 }
 
-// challenge asks the browser for the password. The body is empty on purpose:
-// an error page would be the one piece of our markup an unauthenticated
-// visitor could read.
-func challenge(responseWriter http.ResponseWriter, status int) {
-	responseWriter.Header().Set("WWW-Authenticate", `Basic realm="`+realm+`", charset="UTF-8"`)
-	// Without this a cache could serve the challenge, or worse a page fetched
-	// with someone else's credentials, to another visitor.
+// refuse answers a request that arrived without a session.
+//
+// A page navigation gets the password field, since a person is waiting for
+// something to look at. Anything under /api/ gets a bare status: those callers
+// are scripts and fetches, and handing them a login page to parse would only
+// make a failure harder to read.
+func refuse(responseWriter http.ResponseWriter, request *http.Request, status int) {
+	// Without this a cache could serve the refusal, or worse a page fetched
+	// with someone else's cookie, to another visitor.
 	responseWriter.Header().Set("Cache-Control", "no-store")
-	responseWriter.WriteHeader(status)
+
+	if strings.HasPrefix(request.URL.Path, "/api/") {
+		responseWriter.WriteHeader(status)
+
+		return
+	}
+
+	message := ""
+	if status == http.StatusTooManyRequests {
+		message = throttledMessage
+	}
+
+	writeLoginPage(responseWriter, status, loginPageData{
+		Message: message,
+		// Back to what they actually asked for once they are in.
+		Redirect: safeRedirect(request.URL.RequestURI()),
+	})
 }
