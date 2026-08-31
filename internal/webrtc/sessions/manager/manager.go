@@ -106,6 +106,7 @@ func (m *SessionManager) GetSessionStates(includePrivateStreams bool) (result []
 
 		streamSession := session.StreamSessionState{
 			StreamKey:   s.StreamKey,
+			IsOnline:    s.HasHost.Load(),
 			StreamStart: s.StreamStart,
 			IsPublic:    s.IsPublic,
 			MOTD:        s.MOTD,

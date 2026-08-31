@@ -16,7 +16,11 @@ type whipSessionStatus struct {
 
 // Information for a whip session
 type StreamSessionState struct {
-	StreamKey   string    `json:"streamKey"`
+	StreamKey string `json:"streamKey"`
+	// IsOnline reports whether a broadcaster is currently publishing. A session
+	// outlives its host: a viewer waiting on a stream that has not started, or
+	// has just ended, keeps one alive with no host attached.
+	IsOnline    bool      `json:"isOnline"`
 	IsPublic    bool      `json:"isPublic"`
 	MOTD        string    `json:"motd"`
 	StreamStart time.Time `json:"streamStart"`
