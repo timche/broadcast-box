@@ -10,7 +10,9 @@
       content="Broadcast Box is a tool that allows you to efficiently stream high-quality video in real time, using the latest in video codecs and WebRTC technology."
     />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="manifest" href="/manifest.json" />
+    <!-- use-credentials because the manifest is fetched without cookies by
+         default, which a site behind the password gate answers with a 401. -->
+    <link rel="manifest" href="/manifest.json" crossorigin="use-credentials" />
     <link rel="apple-touch-icon" href="/icon-180.png" />
     <meta name="theme-color" content="#111214" />
     <!-- iOS has no manifest support worth relying on: these two are what make

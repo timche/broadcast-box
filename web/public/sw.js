@@ -43,8 +43,14 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     fetch(request)
       .then((response) => {
-        const copy = response.clone();
-        void caches.open(SHELL_CACHE).then((cache) => cache.put(SHELL_URL, copy));
+        // A refusal from the password gate is not the app shell. Caching it
+        // would hand the login page to someone who is logged in but offline,
+        // and there would be nothing they could do with it.
+        if (response.ok) {
+          const copy = response.clone();
+          void caches.open(SHELL_CACHE).then((cache) => cache.put(SHELL_URL, copy));
+        }
+
         return response;
       })
       .catch(() => caches.match(SHELL_URL).then((cached) => cached ?? Response.error())),
