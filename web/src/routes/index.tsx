@@ -1,8 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Check, Copy, Info, Radio, Users, Video } from "lucide-react";
 import { useState } from "react";
-import { NowLive } from "@/components/now-live";
-import { PreviouslyWatched } from "@/components/previously-watched";
+import { StreamList } from "@/components/stream-list";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -134,12 +133,7 @@ function Home() {
                 </Button>
               </div>
 
-              {isWatch && (
-                <>
-                  <NowLive />
-                  <PreviouslyWatched />
-                </>
-              )}
+              {isWatch && <StreamList />}
             </>
           )}
         </CardContent>
