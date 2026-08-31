@@ -384,6 +384,11 @@ that knowing a stream key no longer lets anyone watch. It does not cover `/api/w
 has one `Authorization` header and the stream key already occupies it. Publishing keeps its own
 authorization, so restrict it with [Stream Profile Policy](#stream-profile-policy) rather than this.
 
+Because `/api/status` is behind the gate, `DISABLE_STATUS` is no longer needed to keep the list of live
+streams away from the public, and can be dropped so that stream discovery works for the people who have
+logged in. Drop the variable rather than setting it to `false`: any non-empty value disables the
+endpoint.
+
 Two things worth knowing before relying on it:
 
 - **The password is checked in the origin, not at a proxy.** WebRTC media never passes through an HTTP
