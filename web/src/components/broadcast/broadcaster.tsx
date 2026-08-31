@@ -11,9 +11,16 @@ import {
   InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group";
+import { Input } from "@/components/ui/input";
 import { toast } from "@/components/ui/toast";
 import { useChatMessageAlert } from "@/hooks/use-chat-message-alert";
 import { useViewerAlert } from "@/hooks/use-viewer-alert";
+import { getErrorStatus } from "@/lib/api";
+import {
+  clearStreamPassword,
+  resolveStreamPassword,
+  setStreamPassword,
+} from "@/lib/stream-password";
 import type { StreamStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { type ChatConnection, createChatConnection } from "@/lib/webrtc/chat";
@@ -67,6 +74,8 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
   const [publishSuccess, setPublishSuccess] = useState(false);
   const [disconnected, setDisconnected] = useState(false);
   const [connectFailed, setConnectFailed] = useState(false);
+  const [needsStreamPassword, setNeedsStreamPassword] = useState(false);
+  const [streamPasswordDraft, setStreamPasswordDraft] = useState("");
   const [hasPacketLoss, setHasPacketLoss] = useState(false);
   const [hasSignal, setHasSignal] = useState(false);
   const [previewHidden, setPreviewHidden] = useState(false);
@@ -126,6 +135,17 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
   const stopStream = useCallback((stream: MediaStream | null) => {
     stream?.getTracks().forEach((track) => track.stop());
   }, []);
+
+  // Re-runs the publish effect, which reads the password back out of storage.
+  const submitStreamPassword = () => {
+    if (streamPasswordDraft === "") {
+      return;
+    }
+
+    setStreamPassword(streamPasswordDraft);
+    setNeedsStreamPassword(false);
+    setRequestCount((count) => count + 1);
+  };
 
   const requestMedia = (nextSource: Exclude<MediaSource, "None">) => {
     if (!navigator.mediaDevices) {
@@ -206,7 +226,12 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
         };
 
         try {
-          const eventSource = await negotiateWhip(peerConnection, streamKey);
+          const eventSource = await negotiateWhip(
+            peerConnection,
+            streamKey,
+            await resolveStreamPassword(),
+          );
+          setNeedsStreamPassword(false);
           eventSourceRef.current?.close();
           eventSourceRef.current = eventSource;
           if (eventSource !== null) {
@@ -218,8 +243,18 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
               reportViewerCount(streamKey, status.isOnline ? status.viewers : null);
             });
           }
-        } catch {
-          setConnectFailed(true);
+        } catch (error) {
+          // A 401 here means the server wants a stream password, not that it is
+          // unreachable. The site password the browser is holding cannot be
+          // reused: it lives in the browser's HTTP authentication cache, which
+          // scripts cannot read. So the broadcaster is asked for it once.
+          if (getErrorStatus(error) === 401) {
+            clearStreamPassword();
+            setStreamPasswordDraft("");
+            setNeedsStreamPassword(true);
+          } else {
+            setConnectFailed(true);
+          }
         }
       },
       (error: unknown) => {
@@ -312,6 +347,33 @@ export function Broadcaster({ streamKey }: BroadcasterProps) {
             {previewHidden && (
               <div className="text-muted-foreground flex size-full items-center justify-center">
                 Preview hidden
+              </div>
+            )}
+
+            {needsStreamPassword && (
+              <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/80 p-4">
+                <div className="bg-card flex w-full max-w-sm flex-col gap-3 rounded-lg border p-4">
+                  <h2 className="text-lg font-medium">Stream password required</h2>
+                  <p className="text-muted-foreground text-sm">
+                    This server asks broadcasters for a password before going live.
+                  </p>
+                  <Input
+                    type="password"
+                    autoFocus
+                    aria-label="Stream password"
+                    placeholder="Stream password"
+                    value={streamPasswordDraft}
+                    onChange={(event) => setStreamPasswordDraft(event.target.value)}
+                    onKeyUp={(event) => {
+                      if (event.key === "Enter") {
+                        submitStreamPassword();
+                      }
+                    }}
+                  />
+                  <Button onClick={submitStreamPassword} disabled={streamPasswordDraft === ""}>
+                    Go live
+                  </Button>
+                </div>
               </div>
             )}
 
