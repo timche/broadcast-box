@@ -71,7 +71,7 @@ func GetServeMuxHandler() http.HandlerFunc {
 			}
 		}
 
-		if isPublishPath(request.URL.Path) {
+		if isPublishPath(request.URL.Path) || isAdminPath(request.URL.Path) {
 			serverMux.ServeHTTP(responseWriter, request)
 
 			return
@@ -90,6 +90,18 @@ func GetServeMuxHandler() http.HandlerFunc {
 // STREAM_PROFILE_POLICY for requiring a reserved token there.
 func isPublishPath(requestPath string) bool {
 	return requestPath == "/api/whip" || strings.HasPrefix(requestPath, "/api/whip/")
+}
+
+// isAdminPath reports whether a request is for the admin API, which carries
+// FRONTEND_ADMIN_TOKEN as a bearer token and checks it itself.
+//
+// The clients here are machines - teamspeak-stream-live polls
+// /api/admin/status - and a bearer token leaves no room for Basic credentials
+// in the one Authorization header, exactly as it does for publishing. Gating
+// these behind the site password as well would mean every machine client held
+// two secrets, and would gate a stronger credential behind a weaker shared one.
+func isAdminPath(requestPath string) bool {
+	return strings.HasPrefix(requestPath, "/api/admin/")
 }
 
 func RedirectToHttpsHandler(httpWriter http.ResponseWriter, request *http.Request) {

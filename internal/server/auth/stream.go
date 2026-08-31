@@ -41,6 +41,19 @@ func SplitStreamCredentials(token string) (password string, streamKey string, ok
 	return token[:separator], token[separator+len(streamCredentialSeparator):], true
 }
 
+// StreamToken composes the token a publisher sends, carrying the configured
+// stream password ahead of the stream key when publishing requires one.
+//
+// It exists for the callers that publish from inside this process - the startup
+// network test - which have no broadcaster to type the password for them.
+func StreamToken(streamKey string) string {
+	if !IsStreamPasswordEnabled() {
+		return streamKey
+	}
+
+	return environment.GetStreamPassword() + streamCredentialSeparator + streamKey
+}
+
 // AuthorizeStreamToken checks a publisher's token and returns the stream key it
 // is publishing to.
 //

@@ -18,6 +18,7 @@ import (
 	"github.com/pion/webrtc/v4"
 
 	"github.com/glimesh/broadcast-box/internal/environment"
+	"github.com/glimesh/broadcast-box/internal/server/auth"
 	whipHandlers "github.com/glimesh/broadcast-box/internal/server/handlers/whip"
 	"github.com/glimesh/broadcast-box/internal/webrtc/codecs"
 )
@@ -89,7 +90,9 @@ func run(whipHandler func(res http.ResponseWriter, req *http.Request)) error {
 	})
 
 	req := httptest.NewRequest("POST", "/api/whip", strings.NewReader(offer.SDP))
-	req.Header["Authorization"] = []string{"Bearer networktest"}
+	// The publish gate applies to this loopback request like any other, so the
+	// token has to carry the stream password when one is configured.
+	req.Header["Authorization"] = []string{"Bearer " + auth.StreamToken("networktest")}
 	recorder := httptest.NewRecorder()
 
 	whipHandler(recorder, req)
