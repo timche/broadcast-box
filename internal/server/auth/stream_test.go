@@ -107,6 +107,23 @@ func TestStreamPasswordAuthorizesAndStripsThePrefix(t *testing.T) {
 	}
 }
 
+// StreamToken is what the startup network test publishes with, so a token it
+// composes has to survive the check that guards publishing.
+func TestStreamTokenRoundTrips(t *testing.T) {
+	for name, password := range map[string]string{"configured": "hunter2", "unconfigured": ""} {
+		t.Run(name, func(t *testing.T) {
+			setPasswords(t, "", "", password)
+			resetLimiter(t)
+
+			streamKey, ok := AuthorizeStreamToken(StreamToken("networktest"))
+
+			if !ok || streamKey != "networktest" {
+				t.Fatalf("AuthorizeStreamToken(StreamToken()) = (%q, %v), want (\"networktest\", true)", streamKey, ok)
+			}
+		})
+	}
+}
+
 func TestStreamPasswordRejectsBadTokens(t *testing.T) {
 	tests := map[string]string{
 		"wrong password":     "wrong:my-stream",
