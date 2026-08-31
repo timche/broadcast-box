@@ -23,7 +23,7 @@
 - [URL Parameters](#url-parameters)
 - [Environment Variables](#environment-variables)
 - [CLI Flags](#cli-flags)
-- [Site Password](#site-password)
+- [Passwords](#passwords)
 - [Stream Profile Policy](#stream-profile-policy)
 - [Webhooks](#webhooks)
 - [Network Test on Start](#network-test-on-start)
@@ -286,7 +286,9 @@ The frontend can be configured by passing these URL Parameters.
 | `STREAM_PROFILE_PATH`   | Path to store stream profile configurations. Default is `profiles`.                                                                       |
 | `STREAM_PROFILE_POLICY` | Policy configuration for local reserved profiles. Default is `ANYONE_WITH_RESERVED`. See [Stream Profile Policy](#stream-profile-policy). |
 | `WEBHOOK_URL`           | URL for a webhook backend used to authorize/log publish (`WHIP`) and subscribe (`WHEP`) requests. See [Webhooks](#webhooks).            |
-| `SITE_PASSWORD`         | When set, every page and viewer endpoint requires this password. See [Site Password](#site-password).                                     |
+| `PASSWORD`              | Sets both `SITE_PASSWORD` and `STREAM_PASSWORD` at once. See [Passwords](#passwords).                                                     |
+| `SITE_PASSWORD`         | Password required to view the site. Overrides `PASSWORD`. See [Passwords](#passwords).                                                    |
+| `STREAM_PASSWORD`       | Password required to publish a stream. Overrides `PASSWORD`. See [Passwords](#passwords).                                                |
 
 ### Frontend Configuration
 
@@ -367,11 +369,23 @@ Example:
 go run . -createNewProfile -streamKey MyStream
 ```
 
-## Site Password
+## Passwords
 
-Set `SITE_PASSWORD` to put the whole site behind one shared password. Leave it unset and nothing changes.
+Broadcast Box protects two things separately: watching and publishing. Set `PASSWORD` to cover both
+with one secret, or set `SITE_PASSWORD` and `STREAM_PASSWORD` to give them different ones. A specific
+variable always overrides `PASSWORD`, and leaving all three unset changes nothing.
 
-The server answers every request without it with an HTTP `401`, so the browser draws its own password
+| Set                                | Watching             | Publishing             |
+| ---------------------------------- | -------------------- | ---------------------- |
+| nothing                            | open                 | open                   |
+| `PASSWORD=a`                       | `a`                  | `a`                    |
+| `SITE_PASSWORD=a`                  | `a`                  | open                   |
+| `STREAM_PASSWORD=b`                | open                 | `b`                    |
+| `PASSWORD=a`, `STREAM_PASSWORD=b`  | `a`                  | `b`                    |
+
+### Watching
+
+The server answers every request without the site password with an HTTP `401`, so the browser draws its own password
 prompt. Nothing of the site is served until the password is right: no page, no JavaScript bundle, not
 even an indication of what the server is running or how to log into it.
 
@@ -380,21 +394,48 @@ cannot be suppressed. Only the password is checked, so tell your viewers to leav
 or type anything at all.
 
 The gate covers the frontend, `/api/status`, `/api/whep`, `/api/sse` and `/api/layer`, which is enough
-that knowing a stream key no longer lets anyone watch. It does not cover `/api/whip`: a WHIP broadcaster
-has one `Authorization` header and the stream key already occupies it. Publishing keeps its own
-authorization, so restrict it with [Stream Profile Policy](#stream-profile-policy) rather than this.
+that knowing a stream key no longer lets anyone watch. It does not cover `/api/whip`, which is what
+`STREAM_PASSWORD` is for.
 
 Because `/api/status` is behind the gate, `DISABLE_STATUS` is no longer needed to keep the list of live
 streams away from the public, and can be dropped so that stream discovery works for the people who have
 logged in. Drop the variable rather than setting it to `false`: any non-empty value disables the
 endpoint.
 
-Two things worth knowing before relying on it:
+### Publishing
+
+WHIP gives a broadcaster exactly one field — OBS calls it the stream key — so the stream password
+shares it, ahead of the key and separated by a colon:
+
+```
+<streamPassword>:<streamKey>
+```
+
+With `STREAM_PASSWORD=hunter2`, someone publishing to `my-stream` sets their OBS stream key to
+`hunter2:my-stream`. The same applies to FFmpeg's `-authorization` and to any other WHIP client.
+
+The split is on the **last** colon, so a stream password may contain colons; a stream key may not,
+since only letters, numbers, underscore and dash are legal there.
+
+Publishing from the browser fills this in for you. `/publish/<streamKey>` asks the server for the
+password over `GET /api/stream-password`, which is behind the site gate and only ever answers with a
+password when a site password is actually configured — otherwise it would hand the publishing
+credential to the public. Where there is no site gate to have passed, the publish page asks the
+broadcaster to type it instead, and remembers it for the tab.
+
+`STREAM_PASSWORD` is about who may publish at all. To control *which* stream key someone may publish
+to, use [Stream Profile Policy](#stream-profile-policy); the two compose, and the password is checked
+first.
+
+### Before relying on either
 
 - **The password is checked in the origin, not at a proxy.** WebRTC media never passes through an HTTP
   proxy, so the SDP answer hands every viewer this server's public IP as ICE candidates. Anyone who has
   loaded the site once can reach the origin directly, which is why a password enforced only at a CDN or
   firewall can be walked around.
+- **Publishing needs its own password.** The gate cannot cover `/api/whip`, so leaving
+  `STREAM_PASSWORD` unset means anyone who reaches the server can still push a stream to it, even
+  though they cannot watch one.
 - **Serve over HTTPS.** Basic authentication sends the password on every request. TLS is what keeps it
   from being readable in transit, and a `Secure` deployment is assumed.
 

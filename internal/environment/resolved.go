@@ -24,6 +24,7 @@ var (
 	webhookURL              string
 	streamProfilePolicy     string
 	sitePassword            string
+	streamPassword          string
 	frontendAdminToken      string
 	loggingAPIEnabled       bool
 	loggingAPIKey           string
@@ -47,7 +48,12 @@ func ResolveEnvironmentVariables() {
 	frontendDisabled = isSet(FrontendDisabled)
 	webhookURL = os.Getenv(WebhookURL)
 	streamProfilePolicy = os.Getenv(StreamProfilePolicy)
-	sitePassword = os.Getenv(SitePassword)
+	// PASSWORD is the umbrella: it sets both halves, and either can be
+	// overridden on its own. Resolving the fallback here rather than at the call
+	// sites means every reader sees the effective password and none of them has
+	// to know the precedence.
+	sitePassword = firstNonEmpty(os.Getenv(SitePassword), os.Getenv(Password))
+	streamPassword = firstNonEmpty(os.Getenv(StreamPassword), os.Getenv(Password))
 	frontendAdminToken = os.Getenv(FrontendAdminToken)
 	loggingAPIEnabled = isTrue(LoggingAPIEnabled)
 	loggingAPIKey = os.Getenv(LoggingAPIKey)
@@ -81,10 +87,17 @@ func GetStreamProfilePolicy() string {
 	return streamProfilePolicy
 }
 
-// GetSitePassword returns SITE_PASSWORD, or an empty string when the site is
-// not password protected.
+// GetSitePassword returns the password required to view the site: SITE_PASSWORD
+// if set, otherwise PASSWORD. Empty when the site is not password protected.
 func GetSitePassword() string {
 	return sitePassword
+}
+
+// GetStreamPassword returns the password required to publish a stream:
+// STREAM_PASSWORD if set, otherwise PASSWORD. Empty when publishing is not
+// password protected.
+func GetStreamPassword() string {
+	return streamPassword
 }
 
 // GetFrontendAdminToken returns FRONTEND_ADMIN_TOKEN, or an empty string when no
@@ -146,4 +159,16 @@ func isSet(key string) bool {
 
 func isTrue(key string) bool {
 	return strings.EqualFold(os.Getenv(key), "true")
+}
+
+// firstNonEmpty returns the first value that was actually set, so a specific
+// variable overrides the umbrella one it falls back to.
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+
+	return ""
 }

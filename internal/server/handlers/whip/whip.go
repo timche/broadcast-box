@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/glimesh/broadcast-box/internal/environment"
+	"github.com/glimesh/broadcast-box/internal/server/auth"
 	"github.com/glimesh/broadcast-box/internal/server/authorization"
 	"github.com/glimesh/broadcast-box/internal/server/helpers"
 	"github.com/glimesh/broadcast-box/internal/server/webhook"
@@ -32,6 +33,17 @@ func WHIPHandler(responseWriter http.ResponseWriter, request *http.Request) {
 	token := helpers.ResolveBearerToken(authHeader)
 	if token == "" {
 		slog.Info("Authorization was invalid")
+		helpers.LogHTTPError(responseWriter, "Authorization was invalid", http.StatusUnauthorized)
+		return
+	}
+
+	// A publisher's token carries the stream password ahead of the stream key.
+	// Checked before the method branches, because a broadcaster sends the same
+	// header for the offer, the trickle ICE patches and the closing delete, and
+	// exempting any of them would leave a way in that skips the password.
+	token, isAuthorized := auth.AuthorizeStreamToken(token)
+	if !isAuthorized {
+		slog.Warn("API.WHIP: Rejected publish, stream password was invalid")
 		helpers.LogHTTPError(responseWriter, "Authorization was invalid", http.StatusUnauthorized)
 		return
 	}

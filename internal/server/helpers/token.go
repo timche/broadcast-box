@@ -23,7 +23,10 @@ func ResolveBearerToken(authHeader string) (result string) {
 
 			// Invalid, handle as unicode
 		} else {
-			re := regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+			// The colon carries a publisher's password in "<password>:<streamKey>".
+			// OBS and FFmpeg send the token as typed rather than base64 encoded,
+			// so without it here a prefixed token never survives resolution.
+			re := regexp.MustCompile(`^[A-Za-z0-9_:-]+$`)
 
 			auth = strings.TrimSpace(auth)
 			auth = strings.ReplaceAll(auth, " ", "_")

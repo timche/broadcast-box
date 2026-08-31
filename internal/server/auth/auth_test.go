@@ -16,6 +16,9 @@ func setPassword(t *testing.T, password string) {
 	t.Helper()
 
 	t.Cleanup(environment.ResolveEnvironmentVariables)
+	// PASSWORD would otherwise stand in for an unset SITE_PASSWORD and leave
+	// the gate enabled in the tests that expect it inert.
+	t.Setenv(environment.Password, "")
 	t.Setenv(environment.SitePassword, password)
 	environment.ResolveEnvironmentVariables()
 }

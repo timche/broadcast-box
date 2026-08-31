@@ -35,6 +35,9 @@ func GetServeMuxHandler() http.HandlerFunc {
 	// WHEP session endpoints
 	serverMux.HandleFunc("/api/layer/", corsHandler(layerChangeHandler))
 
+	// Publishing password, for browser publishers who are already past the gate.
+	serverMux.HandleFunc("/api/stream-password", corsHandler(auth.StreamPasswordHandler))
+
 	// Logging and status endpoints
 	serverMux.HandleFunc("/api/log", corsHandler(logHandler))
 	serverMux.HandleFunc("/api/status", corsHandler(statusHandler))

@@ -7,6 +7,18 @@ const SIMULCAST_PREFIX = "Web";
 export class WhipError extends Error {}
 
 /**
+ * WHIP gives a broadcaster one field, so the stream password shares it with the
+ * stream key as `<password>:<streamKey>`. The server splits on the last colon,
+ * which is why a password may contain one and a stream key may not.
+ *
+ * An empty password sends the stream key alone, exactly as before, so a server
+ * with no stream password configured is unaffected.
+ */
+export function buildPublishToken(streamKey: string, streamPassword: string): string {
+  return streamPassword === "" ? streamKey : `${streamPassword}:${streamKey}`;
+}
+
+/**
  * Adds the send-only audio/video transceivers for a publish session, with
  * simulcast encodings on browsers that support them (skipped on Firefox).
  */
@@ -38,6 +50,7 @@ export function addPublishTransceivers(
 export async function negotiateWhip(
   peerConnection: RTCPeerConnection,
   streamKey: string,
+  streamPassword: string,
 ): Promise<EventSource | null> {
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
@@ -46,7 +59,7 @@ export async function negotiateWhip(
     method: "POST",
     body: offer.sdp ?? "",
     headers: {
-      Authorization: base64Bearer(streamKey),
+      Authorization: base64Bearer(buildPublishToken(streamKey, streamPassword)),
       "Content-Type": "application/sdp",
     },
     responseType: "text",
