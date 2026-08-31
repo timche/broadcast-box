@@ -16,7 +16,9 @@ import { Label } from "@/components/ui/label";
 import { toast } from "@/components/ui/toast";
 import { useIsNarrowViewport } from "@/hooks/use-is-narrow-viewport";
 import { useStreamOnline } from "@/hooks/use-stream-online";
+import { useStreamPassword } from "@/hooks/use-stream-password";
 import { getLastStreamName, setLastStreamName } from "@/lib/last-stream";
+import { getStreamPassword, setStreamPassword } from "@/lib/stream-password";
 import { cn } from "@/lib/utils";
 
 type HomeTab = "watch" | "stream" | "obs";
@@ -221,6 +223,23 @@ function ObsGuide({
   // Poll the stream status so the user can see OBS connect after they hit Start.
   const isLive = useStreamOnline(trimmedName);
 
+  // OBS has one field for both, so a server that asks for a publishing password
+  // wants it in front of the stream name. Handing over a bare name here would
+  // send every broadcaster to a 401 with nothing to explain it.
+  const { required: passwordRequired, password: disclosedPassword } = useStreamPassword();
+  const [typedPassword, setTypedPassword] = useState(getStreamPassword);
+  const streamPassword = disclosedPassword === "" ? typedPassword : disclosedPassword;
+  const isPasswordMissing = passwordRequired && streamPassword === "";
+
+  // Left empty rather than filled with a name that would be rejected: a key
+  // that looks copyable and then fails is worse than one that is not there yet.
+  const streamKey =
+    trimmedName === "" || isPasswordMissing
+      ? ""
+      : passwordRequired
+        ? `${streamPassword}:${trimmedName}`
+        : trimmedName;
+
   return (
     <div className="flex flex-col gap-4">
       <ObsStreamAlert />
@@ -241,6 +260,27 @@ function ObsGuide({
         />
       </div>
 
+      {passwordRequired && disclosedPassword === "" && (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="stream-password">Stream password</Label>
+          <Input
+            id="stream-password"
+            value={typedPassword}
+            placeholder="Enter the publishing password"
+            onChange={(event) => {
+              setTypedPassword(event.target.value);
+              // Remembered for this tab, so publishing from the browser does
+              // not ask for it again.
+              setStreamPassword(event.target.value);
+            }}
+          />
+          <p className="text-muted-foreground text-sm">
+            This server asks broadcasters for a password. It goes in front of your stream name in
+            the key below.
+          </p>
+        </div>
+      )}
+
       <ol className="flex list-decimal flex-col gap-3 ps-5 text-sm">
         <li>
           In OBS, open <span className="font-medium">Settings → Stream</span>.
@@ -254,8 +294,9 @@ function ObsGuide({
           <CopyField value={whipUrl} label="Server URL" />
         </li>
         <li>
-          Set <span className="font-medium">Stream Key</span> to your stream name:
-          <CopyField value={trimmedName} label="Stream key" />
+          Set <span className="font-medium">Stream Key</span> to{" "}
+          {passwordRequired ? "your password and stream name" : "your stream name"}:
+          <CopyField value={streamKey} label="Stream key" />
         </li>
         <li>
           Optional, for sub-second latency: in{" "}

@@ -2,10 +2,15 @@ import { api } from "@/lib/api";
 
 const STREAM_PASSWORD_STORAGE_KEY = "streamPassword";
 
-interface StreamPasswordState {
+export interface StreamPasswordState {
   required: boolean;
   /** Empty unless the site gate is what let this request through. */
   password: string;
+}
+
+/** Asks the server whether publishing needs a password, and for it if it may. */
+export function fetchStreamPasswordState(): Promise<StreamPasswordState> {
+  return api<StreamPasswordState>("/stream-password");
 }
 
 /**
@@ -18,7 +23,7 @@ interface StreamPasswordState {
  */
 export async function resolveStreamPassword(): Promise<string> {
   try {
-    const state = await api<StreamPasswordState>("/stream-password");
+    const state = await fetchStreamPasswordState();
 
     if (state.password !== "") {
       // Remembered so a later attempt still has it if the endpoint is briefly
