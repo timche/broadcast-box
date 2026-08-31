@@ -107,6 +107,36 @@ func TestGetSessionAndWHEPByIDFindsRegisteredSession(t *testing.T) {
 	}
 }
 
+// A session outlives its host, so the status list has to say which of them a
+// broadcaster is actually publishing to. Without it a viewer waiting on a
+// stream that has not started looks identical to a live one.
+func TestSessionStatesReportWhetherAHostIsPublishing(t *testing.T) {
+	m := newTestManager(t)
+
+	streamSession, err := m.addSession(authorization.PublicProfile{StreamKey: "stream-key", IsPublic: true})
+	if err != nil {
+		t.Fatalf("failed to add session: %v", err)
+	}
+
+	t.Cleanup(streamSession.Close)
+
+	states := m.GetSessionStates(false)
+	if len(states) != 1 {
+		t.Fatalf("expected one session state, got %d", len(states))
+	}
+
+	if states[0].IsOnline {
+		t.Fatal("expected a session with no host to report offline")
+	}
+
+	streamSession.HasHost.Store(true)
+
+	states = m.GetSessionStates(false)
+	if !states[0].IsOnline {
+		t.Fatal("expected a session with a host to report online")
+	}
+}
+
 func TestWHEPIndexEntryRemovedWhenWHEPSessionCloses(t *testing.T) {
 	m := newTestManager(t)
 
