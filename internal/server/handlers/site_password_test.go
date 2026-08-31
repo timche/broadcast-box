@@ -82,6 +82,21 @@ func TestSitePasswordDoesNotGatePublishing(t *testing.T) {
 	}
 }
 
+// The admin API carries FRONTEND_ADMIN_TOKEN as a bearer token and checks it
+// itself, so the gate must let it reach that check rather than challenge a
+// machine client that has no Basic credentials to send.
+func TestSitePasswordDoesNotGateTheAdminAPI(t *testing.T) {
+	handler := gatedHandler(t, "hunter2")
+
+	for _, target := range []string{"/api/admin/login", "/api/admin/status", "/api/admin/profiles"} {
+		recorder := requestPath(t, handler, http.MethodPost, target)
+
+		if authenticate := recorder.Header().Get("WWW-Authenticate"); authenticate != "" {
+			t.Fatalf("expected %s to bypass the site password gate, got a challenge", target)
+		}
+	}
+}
+
 // A route added later must be gated by default, so the gate wraps the mux
 // rather than a list of paths. An unmatched path falls through to the frontend
 // handler, which is exactly the case a per-route gate would miss.
